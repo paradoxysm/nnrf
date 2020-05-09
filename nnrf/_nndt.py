@@ -1,17 +1,21 @@
 import numpy as np
-from sklearn.base import BaseEstimator
 
 from nnrf.ml import get_loss, get_activation, get_regularizer
 from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-class NNDT(BaseEstimator):
+from nnrf._base import Base
+
+
+class NNDT(Base):
 	def __init__(self, d=5, r='sqrt', loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, rate=0.001,
 					max_iter=100, tol=1e-4, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
+		super().__init__(verbose=verbose, warm_start=warm_start, metric=metric,
+						random_state=random_state)
 		self.d = d
 		self.r = r
 		self.activation = get_activation(activation)
@@ -23,11 +27,6 @@ class NNDT(BaseEstimator):
 		self.tol = tol
 		self.batch_size = batch_size
 		self.class_weight = class_weight
-		self.verbose = verbose
-		self.warm_start = warm_start
-		self.metric = get_metrics(metric)
-		self.random_state = create_random_state(seed=random_state)
-		self.fitted_ = False
 		self.weights_ = np.array([])
 		self.bias_ = np.array([])
 		self.inputs_ = np.array([])
@@ -102,14 +101,6 @@ class NNDT(BaseEstimator):
 		if verbose > 0 : print("Training complete.")
 		return self
 
-	def predict(self, X):
-		pred = self.predict_proba(X)
-		pred = np.argmax(pred, axis=1)
-		return pred
-
-	def predict_log_proba(self, X):
-		return np.log(self.predict_proba(X))
-
 	def predict_proba(self, X):
 		if not self._is_fitted():
 			raise RunTimeError("Model is not fitted")
@@ -117,11 +108,6 @@ class NNDT(BaseEstimator):
 		if verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
 		return self._forward(X)
-
-	def score(self, X, Y, weights=None):
-		pred = self.predict(X)
-		if weights is None : weights = np.ones(len(X))
-		return self.metric.score(pred, Y, weights=weights)
 
 	def _is_fitted(self):
 		weights = len(self.weights_) > 0
@@ -211,16 +197,3 @@ class NNDT(BaseEstimator):
 		elif isinstance(self.r, float) and 0 < self.r <= 1 : self.r = int(self.r * self.n_features_)
 		elif not (isinstance(self.r, int) and self.r > 0):
 			raise ValueError("R must be None, a positive int or float in (0,1]")
-
-	def _calculate_weight(self, Y, weights=None):
-		if weights is None : weights = np.ones(len(Y))
-		d = self.class_weight
-		if isinstance(d, str) and d == 'balanced':
-			l = len(Y) / (self.n_classes * np.bincount(Y))
-			d = {k: l[k] for k in range(len(l))}
-		elif isinstance(d, dict):
-			k = list(d.keys())
-			class_weights = np.where(Y == k, self.class_weight[k])
-		elif d is None : class_weights = np.ones(len(Y))
-		else : raise ValueError("Class Weight must either be a dict or 'balanced' or None")
-		return weights * class_weights

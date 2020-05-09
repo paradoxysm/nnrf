@@ -7,6 +7,8 @@ from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
+from nnrf._base import Base
+
 
 class NNRF(BaseEstimator):
 	def __init__(self, n=50, d=5, r='sqrt', rate=0.001, loss='cross-entropy',
@@ -14,6 +16,8 @@ class NNRF(BaseEstimator):
 					bootstrap_size=None, batch_size=None, class_weight=None, softmax=False,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
+		super().__init__(verbose=verbose, warm_start=warm_start, metric=metric,
+						random_state=random_state)
 		self.n = n
 		self.d = d
 		self.r = r
@@ -27,11 +31,6 @@ class NNRF(BaseEstimator):
 		self.batch_size = batch_size
 		self.class_weight = class_weight
 		self.softmax = softmax
-		self.verbose = verbose
-		self.warm_start = warm_start
-		self.metric = get_metrics(metric)
-		self.random_state = create_random_state(seed=random_state)
-		self.fitted_ = False
 		self.estimators_ = []
 		self.weights_ = np.array([])
 		self.bias_ = np.array([])
@@ -99,14 +98,6 @@ class NNRF(BaseEstimator):
 		if verbose > 0 : print("Training complete.")
 		return self
 
-	def predict(self, X):
-		pred = self.predict_proba(X)
-		pred = np.argmax(pred, axis=1)
-		return pred
-
-	def predict_log_proba(self, X):
-		return np.log(self.predict_proba(X))
-
 	def predict_proba(self, X):
 		if not self._is_fitted():
 			raise RunTimeError("Model is not fitted")
@@ -122,11 +113,6 @@ class NNRF(BaseEstimator):
 				pred += e.predict_proba(X)
 				pred /= self.n
 		return pred
-
-	def score(self, X, Y, weights=None):
-		pred = self.predict(X)
-		if weights is None : weights = np.ones(len(X))
-		return self.metric.score(pred, Y, weights=weights)
 
 	def set_warm_start(self, warm):
 		for e in self.estimators_:
@@ -191,16 +177,3 @@ class NNRF(BaseEstimator):
 		Z = np.dot(self.weights_, pred) + self.bias_
 		A = get_activation('softmax').activation(Z)
 		return A, Z
-
-	def _calculate_weight(self, Y, weights=None):
-		if weights is None : weights = np.ones(len(Y))
-		d = self.class_weight
-		if isinstance(d, str) and d == 'balanced':
-			l = len(Y) / (self.n_classes * np.bincount(Y))
-			d = {k: l[k] for k in range(len(l))}
-		elif isinstance(d, dict):
-			k = list(d.keys())
-			class_weights = np.where(Y == k, self.class_weight[k])
-		elif d is None : class_weights = np.ones(len(Y))
-		else : raise ValueError("Class Weight must either be a dict or 'balanced' or None")
-		return weights * class_weights
