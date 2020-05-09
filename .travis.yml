@@ -11,11 +11,7 @@ before_install:
     - pip install codecov
 install:
     - pip install ".[test]" .
-before_script:
-    - "curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | sudo bash"
 script:
     - pytest
-    - fossa init
-    - fossa analyze
 after_success:
     - codecov
