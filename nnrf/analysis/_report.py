@@ -1,6 +1,6 @@
 import numpy as np
 
-from sleep.utils.analysis import multiconfusion_matrix
+from nnrf.analysis import multiconfusion_matrix
 
 def calculate_statistics(labels, targets, beta=1, average=None):
 		"""

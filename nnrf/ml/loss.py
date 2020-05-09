@@ -1,9 +1,6 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-from sleep.utils.data import normalize as n
-from sleep.utils.misc import one_hot
-
 def get_loss(name):
 	if name == 'mse' : return MSE()
 	elif name == 'mae' : return MAE()

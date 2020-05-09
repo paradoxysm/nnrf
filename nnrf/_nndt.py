@@ -206,8 +206,8 @@ class NNDT(BaseEstimator):
 	def _calculate_r(self):
 		if self.n_features_ is None:
 			raise ValueError("Number of features needs to be set first to calculate r")
-		if self.r = 'sqrt' : self.r = int(np.sqrt(self.n_features_))
-		elif self.r = 'log2' : self.r = int(np.log(self.n_features_) / np.log(2))
+		if self.r == 'sqrt' : self.r = int(np.sqrt(self.n_features_))
+		elif self.r == 'log2' : self.r = int(np.log(self.n_features_) / np.log(2))
 		elif isinstance(self.r, float) and 0 < self.r <= 1 : self.r = int(self.r * self.n_features_)
 		elif not (isinstance(self.r, int) and self.r > 0):
 			raise ValueError("R must be None, a positive int or float in (0,1]")
