@@ -59,23 +59,23 @@ def one_hot(Y, cols=None):
 		Y = np.where(Y < cols, 0, 1)
 		return Y.reshape(-1, 1)
 
-	def decode(Y):
-		"""
-		Decode one-hot encoded data
-		into a 1-dimensional array.
+def decode(Y):
+	"""
+	Decode one-hot encoded data
+	into a 1-dimensional array.
 
-		Parameters
-		----------
-		Y : ndarray, shape=(n_samples, n_cols)
-			One-hot encoded data.
+	Parameters
+	----------
+	Y : ndarray, shape=(n_samples, n_cols)
+		One-hot encoded data.
 
-		Returns
-		-------
-		decode : ndarray, shape=(n_samples,)
-			Decoded data.
-		"""
-		if Y.shape[0] == Y.size:
-			return np.squeeze(Y)
-		elif set(Y) != set([0,1]):
-			raise ValueError("Y must be one-hot encoded data with ints.")
-		return np.argmax(Y, axis=1)
+	Returns
+	-------
+	decode : ndarray, shape=(n_samples,)
+		Decoded data.
+	"""
+	if Y.shape[0] == Y.size:
+		return np.squeeze(Y)
+	elif set(Y) != set([0,1]):
+		raise ValueError("Y must be one-hot encoded data with ints.")
+	return np.argmax(Y, axis=1)
