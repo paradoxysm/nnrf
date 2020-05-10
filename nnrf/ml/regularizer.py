@@ -57,7 +57,7 @@ class Regularizer(Base, ABC):
 		"""
 		raise NotImplementedError("No cost function implemented")
 
-	def gradient(self, w, *args, axis=1 **kwargs):
+	def gradient(self, w, *args, axis=1, **kwargs):
 		"""
 		Calculate the gradient of the cost penalty.
 

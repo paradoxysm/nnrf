@@ -76,6 +76,6 @@ def one_hot(Y, cols=None):
 		"""
 		if Y.shape[0] == Y.size:
 			return np.squeeze(Y)
-		elif set(Y) != set([0,1])
+		elif set(Y) != set([0,1]):
 			raise ValueError("Y must be one-hot encoded data with ints.")
 		return np.argmax(Y, axis=1)
