@@ -4,6 +4,28 @@ from abc import ABC, abstractmethod
 from nnrf._base import Base
 
 def get_loss(name):
+	"""
+	Lookup table of default loss functions.
+
+	Parameters
+	----------
+	name : LossFunction, None, str
+		LossFunction to look up. Must be one of:
+		 - 'mse' : Mean Squared Error.
+		 - 'mae' : Mean Absolute Error.
+		 - 'huber' : Huber Loss.
+		 - 'hinge' : Hinge Loss.
+		 - 'cross-entropy' : Crossentropy Loss.
+		 - LossFunction : A custom implementation.
+		 - None : Return None.
+		Custom LossFunctions must implement `loss`, `gradient`
+		functions and contain `scale` attribute.
+
+	Returns
+	-------
+	loss : LossFunction or None
+		The loss function.
+	"""
 	if name == 'mse' : return MSE()
 	elif name == 'mae' : return MAE()
 	elif name == 'huber' : return Huber()
@@ -14,21 +36,73 @@ def get_loss(name):
 
 
 class LossFunction(Base, ABC):
+	"""
+	Base Loss Function.
+
+	Attributes
+	----------
+	scale : tuple or None
+		Acceptable range of loss function for gradient.
+	"""
 	def __init__(self, *args, **kwargs):
+		super().__init__()
 		self.scale = None
 		self.name = 'loss'
 
 	@abstractmethod
 	def loss(self, Y_hat, Y, *args, axis=1, **kwargs):
+		"""
+		Loss/error between labels `Y_hat` and targets `Y`.
+
+		Parameters
+		----------
+		Y_hat : array-like, shape=(n_samples, n_classes)
+			Prediction labels.
+
+		Y : array-like, shape=(n_samples, n_classes)
+			Ground truth labels.
+
+		axis : int, default=1
+			Axis to compute loss.
+
+		Returns
+		-------
+		loss : array-like, shape=(n_samples, n_classes)
+			The error of each sample for each class.
+		"""
 		raise NotImplementedError("No loss function implemented")
 
 	@abstractmethod
 	def gradient(self, Y_hat, Y, *args, axis=1, **kwargs):
+		"""
+		Derivative of loss/error between labels `Y_hat` and targets `Y`.
+
+		Parameters
+		----------
+		Y_hat : array-like, shape=(n_samples, n_classes)
+			Prediction labels.
+
+		Y : array-like, shape=(n_samples, n_classes)
+			Ground truth labels.
+
+		axis : int, default=1
+			Axis to compute loss.
+
+		Returns
+		-------
+		dY : array-like, shape=(n_samples, n_classes)
+			The derivative of the error of each sample for each class.
+		"""
 		raise NotImplementedError("No gradient function implemented")
 
 class MSE(LossFunction):
+	"""
+	Mean Squared Error.
+	Note that this implementation is really
+	just a squared error and not a mean.
+	"""
 	def __init__(self):
-		self.scale = None
+		super().__init__()
 		self.name = 'mse'
 
 	def loss(self, Y_hat, Y, axis=1):
@@ -38,8 +112,13 @@ class MSE(LossFunction):
 		return -2 * (Y - Y_hat)
 
 class MAE(LossFunction):
+	"""
+	Mean Absolute Error.
+	Note that this implementation is really
+	just an absolute error and not a mean.
+	"""
 	def __init__(self):
-		self.scale = None
+		super().__init__()
 		self.name = 'mae'
 
 	def loss(self, Y_hat, Y, axis=1):
@@ -51,7 +130,18 @@ class MAE(LossFunction):
 		return grad
 
 class Huber(LossFunction):
+	"""
+	Huber Loss.
+
+	Parameters
+	----------
+	delta : float, default=1
+		Determines relationship between MSE and MAE
+		character. Higher values approach MSE loss
+		while lower values towards 0 approach MAE loss.
+	"""
 	def __init__(self, delta=1):
+		super().__init__()
 		self.delta = delta
 		self.scale = None
 		self.name = 'huber'
@@ -69,7 +159,11 @@ class Huber(LossFunction):
 		return np.where(mask, lin, Y_hat - Y)
 
 class CrossEntropy(LossFunction):
+	"""
+	Cross Entropy Loss.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.scale = (0, 1)
 		self.name = 'cross-entropy'
 
@@ -80,7 +174,11 @@ class CrossEntropy(LossFunction):
 		return - (np.divide(Y, Y_hat) - np.divide(1 - Y, 1 - Y_hat))
 
 class Hinge(LossFunction):
+	"""
+	Hinge Loss.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.scale = (-1, 1)
 		self.name = 'hinge'
 

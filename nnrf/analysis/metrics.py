@@ -40,6 +40,7 @@ class Metric(Base, ABC):
 	Base Metric class.
 	"""
 	def __init__(self):
+		super().__init__()
 		self.name = "metric"
 
 	@abstractmethod
@@ -106,6 +107,7 @@ class Accuracy(Metric):
 	Accuracy Metric.
 	"""
 	def __init__(self):
+		super().__init__()
 		self.name = "accuracy"
 
 	def calculate(self, Y_hat, Y, average='micro', weights=None):
@@ -139,6 +141,7 @@ class Precision(Metric):
 	Precision Metric.
 	"""
 	def __init__(self):
+		super().__init__()
 		self.name = "precision"
 
 	def calculate(self, Y_hat_, Y, average='micro', weights=None):
@@ -150,6 +153,7 @@ class Recall(Metric):
 	Recall Metric.
 	"""
 	def __init__(self):
+		super().__init__()
 		self.name = "recall"
 
 	def calculate(self, Y_hat_, Y, average='micro', weights=None):
@@ -166,6 +170,7 @@ class FScore(Metric):
 		Weight of recall in F-score.
 	"""
 	def __init__(self, beta=1):
+		super().__init__()
 		self.name = "f-score"
 		self.beta = beta
 
@@ -178,6 +183,7 @@ class ROCAUC(Metric):
 	Area under the Receiver Operative Curve (ROC AUC) Metric.
 	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'roc-auc'
 
 	def calculate(self, Y_hat_, Y, average='micro', weights=None):

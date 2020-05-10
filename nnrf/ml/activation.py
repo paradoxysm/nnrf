@@ -24,8 +24,8 @@ def get_activation(name):
 		 - 'softmax' : Softmax.
 		 - Activation : A custom implementation.
 		 - None : Return None.
-		Custom Activations must `activation`, `gradient`,
-		`classify`, and `scale`.
+		Custom Activations must implement `activation`, `gradient`,
+		`classify`, and `scale` functions.
 
 	Returns
 	-------
@@ -51,6 +51,7 @@ class Activation(Base, ABC):
 	Base Activation class.
 	"""
 	def __init__(self, *args, **kwargs):
+		super().__init__()
 		self.name = 'activation'
 
 	@abstractmethod
@@ -123,7 +124,11 @@ class Activation(Base, ABC):
 		return Y
 
 class Linear(Activation):
+	"""
+	Linear Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'linear'
 
 	def activation(self, X):
@@ -133,7 +138,11 @@ class Linear(Activation):
 		return np.ones(X.shape)
 
 class Binary(Activation):
+	"""
+	Binary Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'binary'
 
 	def activation(self, X):
@@ -153,7 +162,11 @@ class Binary(Activation):
 		return Y
 
 class Sigmoid(Activation):
+	"""
+	Sigmoid Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'sigmoid'
 
 	def activation(self, X):
@@ -174,7 +187,11 @@ class Sigmoid(Activation):
 		return Y
 
 class Tanh(Activation):
+	"""
+	Tanh Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'tanh'
 
 	def activation(self, X):
@@ -195,7 +212,11 @@ class Tanh(Activation):
 		return Y
 
 class Arctan(Activation):
+	"""
+	Arctan Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'arctan'
 
 	def activation(self, X):
@@ -216,7 +237,11 @@ class Arctan(Activation):
 		return Y
 
 class ReLU(Activation):
+	"""
+	ReLU Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'relu'
 
 	def activation(self, X):
@@ -234,7 +259,16 @@ class ReLU(Activation):
 		return Y
 
 class PReLU(ReLU):
+	"""
+	PReLU Activation Function.
+
+	Parameters
+	----------
+	a : float, default=0.01
+		Leakiness of ReLU.
+	"""
 	def __init__(self, a=0.01):
+		super().__init__()
 		self.name = 'prelu'
 		self.a = a
 
@@ -249,8 +283,17 @@ class PReLU(ReLU):
 		return np.where(X > 0, 1, 0)
 
 class ELU(ReLU):
+	"""
+	ELU Activation Function.
+
+	Parameters
+	----------
+	a : float, default=0.1
+		Factor of exponential function.
+	"""
 	def __init__(self, a=0.1):
 		if a < 0 : raise ValueError("Hyperparameter must be non-negative")
+		super().__init__()
 		self.a = a
 		self.name = 'elu'
 
@@ -265,7 +308,11 @@ class ELU(ReLU):
 		return np.where(X > 0, 1, 0)
 
 class NoisyReLU(ReLU):
+	"""
+	Noisy ReLU Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'noisy-relu'
 
 	def activation(self, X):
@@ -273,7 +320,11 @@ class NoisyReLU(ReLU):
 		return np.maximum(0, X + np.random.normal(scale=sigma))
 
 class Softmax(Activation):
+	"""
+	Softmax Activation Function.
+	"""
 	def __init__(self):
+		super().__init__()
 		self.name = 'softmax'
 
 	def activation(self, X, axis=1):
