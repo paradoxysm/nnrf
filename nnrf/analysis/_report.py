@@ -2,17 +2,17 @@ import numpy as np
 
 from nnrf.analysis import multiconfusion_matrix
 
-def calculate_statistics(labels, targets, beta=1, average=None):
+def calculate_statistics(Y_hat, Y, beta=1, average=None):
 		"""
 		Calculate the precisions, recalls, F-beta scores, and
 		supports for each class in `targets`.
 
 		Parameters
 		----------
-		labels : array-like
+		Y_hat : array-like
 			List of data labels.
 
-		targets : array-like
+		Y : array-like
 			List of target truth labels.
 
 		beta : float, default=1
@@ -47,7 +47,7 @@ def calculate_statistics(labels, targets, beta=1, average=None):
 		"""
 		if beta < 0:
 			raise ValueError("Beta must be non-negative")
-		matrix = multiconfusion_matrix(labels, targets)
+		matrix = multiconfusion_matrix(Y_hat, Y)
 		matrix_labels = list(matrix.keys())
 		matrix = np.array([matrix[l] for l in matrix_labels])
 		tp_sum = matrix[:,1,1]
@@ -88,16 +88,16 @@ def calculate_statistics(labels, targets, beta=1, average=None):
 			supports = {matrix_labels[k]: target_sum[k] for k in range(len(matrix_labels))}
 		return precisions, recalls, fscores, supports
 
-def classification_report(labels, targets, beta=1):
+def classification_report(Y_hat, Y, beta=1):
 	"""
 	Create a report on classification statistics.
 
 	Parameters
 	----------
-	labels : array-like
+	Y_hat : array-like
 		List of data labels.
 
-	targets : array-like
+	Y : array-like
 		List of target truth labels.
 
 	beta : float, default=1
@@ -129,10 +129,10 @@ def classification_report(labels, targets, beta=1):
 						'f-score':0.67,
 		 			}
 	"""
-	stats = calculate_statistics(labels, targets, beta=beta)
-	_, _, accuracy, total = calculate_statistics(labels, targets, beta=beta, average='micro')
-	macro = calculate_statistics(labels, targets, beta=beta, average='macro')
-	weighted = calculate_statistics(labels, targets, beta=beta, average='weighted')
+	stats = calculate_statistics(Y_hat, Y, beta=beta)
+	_, _, accuracy, total = calculate_statistics(Y_hat, Y, beta=beta, average='micro')
+	macro = calculate_statistics(Y_hat, Y, beta=beta, average='macro')
+	weighted = calculate_statistics(Y_hat, Y, beta=beta, average='weighted')
 	h = ['precision', 'recall', 'f-score', 'support']
 	report = {
 				'beta': beta,

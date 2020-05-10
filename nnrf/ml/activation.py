@@ -4,6 +4,34 @@ from abc import ABC, abstractmethod
 from nnrf._base import Base
 
 def get_activation(name):
+	"""
+	Lookup table of default activation functions.
+
+	Parameters
+	----------
+	name : Activation, None, str
+		Activation to look up. Must be one of:
+		 - 'linear' : Linear.
+		 - 'exponential' : Exponential.
+		 - 'binary' : Binary.
+		 - 'sigmoid' : Sigmoid.
+		 - 'tanh' : Tanh.
+		 - 'arctan' : Arctan.
+		 - 'relu' : Rectified Linear Unit (ReLU).
+		 - 'prelu' : Parametric/Leaky ReLU.
+		 - 'elu' : Exponential Linear Unit (ELU).
+		 - 'noisy-relu' : Noisy ReLU.
+		 - 'softmax' : Softmax.
+		 - Activation : A custom implementation.
+		 - None : Return None.
+		Custom Activations must `activation`, `gradient`,
+		`classify`, and `scale`.
+
+	Returns
+	-------
+	activation : Activation or None
+		The activation function.
+	"""
 	if name == 'linear' : return Linear()
 	elif name == 'exponential' : return Exponential()
 	elif name == 'binary' : return Binary()
@@ -11,31 +39,87 @@ def get_activation(name):
 	elif name == 'tanh' : return Tanh()
 	elif name == 'arctan' : return Arctan()
 	elif name == 'relu' : return ReLU()
-	elif name == 'softplus' : return Softplus()
 	elif name == 'prelu' : return PReLU()
-	elif name == 'leaky_relu' : return LeakyReLU()
 	elif name == 'elu' : return ELU()
-	elif name == 'noisy_relu' : return NoisyReLU()
+	elif name == 'noisy-relu' : return NoisyReLU()
 	elif name == 'softmax' : return Softmax()
 	elif isinstance(name, (Activation, None)) : return name
 	else : raise ValueError("Invalid activation function")
 
 class Activation(Base, ABC):
+	"""
+	Base Activation class.
+	"""
 	def __init__(self, *args, **kwargs):
 		self.name = 'activation'
 
 	@abstractmethod
 	def activation(self, X, *args, **kwargs):
+		"""
+		Activation function. Returns `X` transformed
+		by the activation function.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data.
+
+		Returns
+		-------
+		A : array-like, shape=(n_samples, n_features)
+			Data transformed by activation function.
+		"""
 		raise NotImplementedError("No activation function implemented")
 
 	@abstractmethod
 	def gradient(self, X, *args, **kwargs):
+		"""
+		Derivative of activation function. Returns gradient
+		of the activation function at `X`.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data.
+
+		Returns
+		-------
+		dA : array-like, shape=(n_samples, n_features)
+			Gradient of activation function at `X`.
+		"""
 		raise NotImplementedError("No gradient function implemented")
 
 	def classify(self, X, *args, **kwargs):
+		"""
+		Return classifications of `X` after activation.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data.
+
+		Returns
+		-------
+		C : array-like, shape=(n_samples, n_features)
+			Classifications based on `X`.
+		"""
 		return np.where(X > 0, 1, 0)
 
 	def scale(self, Y, loss, *args, **kwargs):
+		"""
+		Scale `Y` to the scale given by the LossFunction
+		`loss`.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data.
+
+		Returns
+		-------
+		S : array-like, shape=(n_samples, n_features)
+			Scaled data.
+		"""
 		return Y
 
 class Linear(Activation):
@@ -131,24 +215,6 @@ class Arctan(Activation):
 			return size * Y + range[0]
 		return Y
 
-class Softplus(Activation):
-	def __init__(self):
-		self.name = 'softplus'
-
-	def activation(self, X):
-		return np.log(1 + np.exp(X))
-
-	def gradient(self, X):
-		return 1 / (1 + np.exp(-X))
-
-	def classify(self, X):
-		raise Warning("Softplus should not be used for classification")
-		return X
-
-	def scale(self, Y, loss):
-		raise Warning("Softplus should not be used for scaling")
-		return Y
-
 class ReLU(Activation):
 	def __init__(self):
 		self.name = 'relu'
@@ -182,15 +248,6 @@ class PReLU(ReLU):
 		raise Warning("PReLU should not be used for classification, using ReLU instead")
 		return np.where(X > 0, 1, 0)
 
-class LeakyReLU(PReLU):
-	def __init__(self):
-		super().__init__(0.01)
-		self.name = 'leaky_relu'
-
-	def classify(self, X):
-		raise Warning("LeakyReLU should not be used for classification, using ReLU instead")
-		return np.where(X > 0, 1, 0)
-
 class ELU(ReLU):
 	def __init__(self, a=0.1):
 		if a < 0 : raise ValueError("Hyperparameter must be non-negative")
@@ -209,7 +266,7 @@ class ELU(ReLU):
 
 class NoisyReLU(ReLU):
 	def __init__(self):
-		self.name = 'noisy_relu'
+		self.name = 'noisy-relu'
 
 	def activation(self, X):
 		sigma = np.std(X, axis=axis)
