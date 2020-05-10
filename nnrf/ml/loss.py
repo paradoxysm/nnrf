@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from nnrf._base import Base
+
 def get_loss(name):
 	if name == 'mse' : return MSE()
 	elif name == 'mae' : return MAE()
@@ -11,7 +13,7 @@ def get_loss(name):
 	else : raise ValueError("Invalid loss function")
 
 
-class LossFunction(ABC):
+class LossFunction(Base, ABC):
 	def __init__(self, *args, **kwargs):
 		self.scale = None
 		self.name = 'loss'

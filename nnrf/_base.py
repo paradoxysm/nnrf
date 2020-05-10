@@ -1,9 +1,43 @@
 import numpy as np
 from abc import ABC, abstractmethod
-from sklearn.base import BaseEstimator
+
+class Base:
+	def __init__(self):
+		pass
+
+	def get_params(self):
+		params = vars(self)
+		for k in params.keys():
+			if isinstance(params[k], Base):
+				params[k] = k.get_params()
+			elif isinstance(params[k], np.random.RandomState):
+				params[k] = {'type': np.random.RandomState,
+								'seed': params[k].get_state()}
+			elif hasattr(params[k], '__dict__'):
+				params[k] = dict(list(vars(params[k]).keys()) + \
+								[('type', type(params[k]))])
+		params = dict(list(params.items()) + [('type', type(self))])
+		return params
+
+	def set_params(self, params):
+		valid = self.get_params().keys()
+		for k, v in params.items():
+			if k not in valid:
+				raise ValueError("Invalid parameter %s for object %s" % \
+									(k, self.__name__))
+			param = v
+			if isinstance(v, dict) and 'type' in v.keys():
+				t = v['type']
+				if t == np.random.RandomState:
+					state = v['seed']
+					param = np.random.RandomState().set_state(state)
+				elif 'get_params' in dir(t) and issubclass(t, Base):
+					param = t().set_params(v.pop('type'))
+			setattr(self, k, v)
+		return self
 
 
-class Base(BaseEstimator, ABC):
+class BaseEstimator(Base, ABC):
 	def __init__(self, verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
 		self.verbose = verbose

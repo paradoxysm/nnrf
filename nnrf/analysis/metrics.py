@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from nnrf._base import Base
+
 def get_metrics(name):
 	if name == 'accuracy' : return Accuracy
 	elif name == 'precision' : return Precision
@@ -10,7 +12,7 @@ def get_metrics(name):
 	else : raise ValueError("Invalid metric function")
 
 
-class Metric(ABC):
+class Metric(Base, ABC):
 	def __init__(self):
 		self.name = "metric"
 
@@ -55,7 +57,7 @@ class Precision(Metric):
 
 	def calculate(self, Y_hat_, Y, average=None):
 		pass
-		
+
 
 class Recall(Metric):
 	def __init__(self):
@@ -69,6 +71,14 @@ class FScore(Metric):
 	def __init__(self, beta=1):
 		self.name = "f-score"
 		self.beta = beta
+
+	def calculate(self, Y_hat_, Y, average=None):
+		pass
+
+
+class ROCAUC(Metric):
+	def __init__(self):
+		self.name = 'roc-auc'
 
 	def calculate(self, Y_hat_, Y, average=None):
 		pass

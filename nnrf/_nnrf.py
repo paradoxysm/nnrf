@@ -7,7 +7,7 @@ from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._base import Base
+from nnrf._base import BaseEstimator
 
 
 class NNRF(BaseEstimator):

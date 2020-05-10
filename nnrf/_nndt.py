@@ -5,10 +5,10 @@ from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._base import Base
+from nnrf._base import BaseEstimator
 
 
-class NNDT(Base):
+class NNDT(BaseEstimator):
 	def __init__(self, d=5, r='sqrt', loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, rate=0.001,
 					max_iter=100, tol=1e-4, batch_size=None, class_weight=None,

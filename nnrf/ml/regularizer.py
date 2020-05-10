@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from nnrf._base import Base
+
 def get_regularizer(name):
 	if name == 'l1' : return L1()
 	elif name == 'l2' : return L2()
@@ -8,7 +10,7 @@ def get_regularizer(name):
 	elif isinstance(name, (None, Regularizer)) : return name
 	else : raise ValueError("Invalid regularizer")
 
-class Regularizer(ABC):
+class Regularizer(Base, ABC):
 	def __init__(self, *args, **kwargs):
 		self.name = 'regularizer'
 
@@ -64,7 +66,7 @@ def get_constraint(name):
 	elif isinstance(name, (None, Constraint)) : return name
 	else : raise ValueError("Invalid regularizer")
 
-class Constraint(ABC):
+class Constraint(Base, ABC):
 	def __init__(self, *args, **kwargs):
 		self.name = 'constraint'
 

@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from nnrf._base import Base
+
 def get_activation(name):
 	if name == 'linear' : return Linear()
 	elif name == 'exponential' : return Exponential()
@@ -18,7 +20,7 @@ def get_activation(name):
 	elif isinstance(name, (Activation, None)) : return name
 	else : raise ValueError("Invalid activation function")
 
-class Activation(ABC):
+class Activation(Base, ABC):
 	def __init__(self, *args, **kwargs):
 		self.name = 'activation'
 
