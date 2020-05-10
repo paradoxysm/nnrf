@@ -11,3 +11,7 @@
 
 ### Version 1.0.0
 The following are changes to be implemented in the `1.0.0` release.
+
+- ![Feature](https://img.shields.io/badge/-Feature-blueviolet?style=flat-square) :
+[`NNRF`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nnrf.py) and [`NNDT`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nndt.py) implemented!
+- ![Documentation](https://img.shields.io/badge/-Documentation-blue?style=flat-square) : Basic documentation for `nnrf` created.

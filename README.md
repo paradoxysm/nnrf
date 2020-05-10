@@ -10,19 +10,19 @@ The NNDT is structured like a binary decision tree with each node simulating a s
 
 The NNRF creates an ensemble of NNDTs that are each trained with bootstrapped data and features, resulting in a powerful model that generalizes well.
 
-More details regarding nnrf can be found in the documentation [here](https://github.com/paradoxysm/nnrf/tree/master/doc).
+More details regarding `nnrf` can be found in the documentation [here](https://github.com/paradoxysm/nnrf/tree/master/doc).
 
 ## Installation
 
-Once you have a suitable python environment setup, nnrf can be easily installed using `pip`:
+Once you have a suitable python environment setup, `nnrf` can be easily installed using `pip`:
 ```
 pip install nnrf
 ```
-> nnrf is tested and supported on Python 3.4+ up to Python 3.7. Usage on other versions of Python is not guaranteed to work as intended.
+> `nnrf` is tested and supported on Python 3.4+ up to Python 3.7. Usage on other versions of Python is not guaranteed to work as intended.
 
-## Using NNRF and NNDT
+## Using NNRFs and NNDTs
 
-NNRF and NNDT can be used to classify data very easily. Furthermore, they extend sklearn's BaseEstimator and generally follow sklearn's API.
+NNRFs and NNDTs can be used to classify data very easily. Furthermore, they generally follow sklearn's API.
 
 ```python
 from nnrf import NNRF
@@ -44,14 +44,14 @@ See the [changelog](https://github.com/paradoxysm/nnrf/blob/master/CHANGES.md) f
 
 [![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability-percentage/paradoxysm/nnrf?style=flat-square)](https://codeclimate.com/github/paradoxysm/nnrf/maintainability)
 
-nnrf is mostly complete, however could use some more rigorous testing.
-Finally, nnrf doesn't faithfully implement sklearn's API all too well - it was mean to follow the API in spirit but wasn't intended to be integrated (as of yet). Any assistance on this is more than welcome!
+`nnrf` is mostly complete, however could use some more rigorous testing.
+Finally, `nnrf` doesn't faithfully implement sklearn's API all too well - it was meant to follow the API in spirit but wasn't intended to be integrated (as of yet). Any assistance on this is more than welcome!
 
 ## Help and Support
 
 ### Documentation
 
-Documentation for nnrf can be found [here](https://github.com/paradoxysm/nnrf/tree/master/doc).
+Documentation for `nnrf` can be found [here](https://github.com/paradoxysm/nnrf/tree/master/doc).
 
 ### Issues and Questions
 
