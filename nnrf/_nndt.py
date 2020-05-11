@@ -1,6 +1,6 @@
 import numpy as np
 
-from nnrf.ml import get_loss, get_activation, get_regularizer
+from nnrf.ml import get_activation, get_regularizer
 from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, decode, \
 						create_random_state, BatchDataset
@@ -42,7 +42,7 @@ class NNDT(BaseEstimator):
 		Must be one of the default regularizers or an object that
 		extends Regularizer. If None, no regularization is done.
 
-	rate : float, default=0.001
+	alpha : float, default=0.001
 		Learning rate. NNDT uses gradient descent.
 
 	max_iter : int, default=10
@@ -104,33 +104,27 @@ class NNDT(BaseEstimator):
 		Biases of the softmax aggregator layer.
 	"""
 	def __init__(self, d=5, r='sqrt', loss='cross-entropy',
-					activation=PReLU(0.2), regularize=None, rate=0.001,
+					activation=PReLU(0.2), regularize=None, alpha=0.001,
 					max_iter=10, tol=1e-4, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
-		super().__init__(batch_size=batch_size, verbose=verbose,
+		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
+						batch_size=batch_size, verbose=verbose,
 						warm_start=warm_start, class_weight=class_weight,
 						metric=metric, random_state=random_state)
 		self.d = d
 		self.r = r
 		self.activation = get_activation(activation)
 		self.softmax = get_activation('softmax')
-		self.loss = get_loss(loss)
 		self.regularizer = get_regularizer(regularize)
-		self.rate = rate
-		self.max_iter = max_iter
-		self.tol = tol
+		self.alpha = alpha
 		self.weights_ = np.array([])
 		self.bias_ = np.array([])
 		self.inputs_ = np.array([])
 		self.sweights_ = np.array([])
 		self.sbias_ = np.array([])
-		self.n_classes_ = None
-		self.n_features_ = None
 		self._p = []
 		self._s = []
-		self._z = []
-		self._x = []
 
 	def _initialize(self):
 		"""
@@ -167,92 +161,6 @@ class NNDT(BaseEstimator):
 		pred = self._forward(X)
 		paths = np.array([np.zeros(len(X))] + self._s[:-1])[:,np.newaxis]
 		return np.concatenate(paths).T
-
-	def fit(self, X, Y, weights=None):
-		"""
-		Train the model on the given data and labels.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Training data.
-
-		Y : array-like, shape=(n_samples,)
-			Target labels as integers.
-
-		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
-
-		Returns
-		-------
-		self : Base
-			Fitted estimator.
-		"""
-		X, Y = check_XY(X=X, Y=Y)
-		if self.n_classes_ is None : self.n_classes_ = len(set(Y))
-		if self.n_features_ is None : self.n_features_ = X.shape[1]
-		try : Y = one_hot(Y, cols=self.n_classes_)
-		except : raise
-		batch_size = self._calculate_batch(len(Y))
-		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(self.batch_size)
-		if not self.warm_start or not self._is_fitted():
-			if verbose > 0 : print("Initializing NNDT")
-			self._initialize()
-		if verbose > 0 : print("Training model for %d epochs" % self.max_iter,
-								"on %d samples in batches of %d." % \
-								(X.shape[0], self.batch_size),
-								"Convergence tolerance set to %.4f." % self.tol)
-		loss_prev, early_stop, e = np.inf, False, 0
-		epochs = range(self.max_iter)
-		if verbose == 1 : epochs = trange(self.max_iter)
-		for e in epochs:
-			batches = range(ds.n_batches)
-			if verbose == 2 : batches = trange(batches)
-			if verbose > 2 : print("Epoch %d" % e)
-			for b in batches:
-				X_batch, Y_batch = ds.next()
-				if X_batch == []:
-					if verbose > 0 : print("No more data to train. Ending training.")
-					early_stop = True
-					break
-				Y_hat = self._forward(X_batch)
-				loss = np.mean(self.loss.loss(Y_hat, Y_batch))
-				metric = self.score(Y_batch, Y_hat=Y_hat, weights=weights)
-				msg = 'loss: %.4f' % loss + ', ' + self.metric.name + ': %.4f' % metric
-				if verbose == 1 : epochs.set_description(msg)
-				elif verbose == 2 : batches.set_description(msg)
-				elif verbose > 2 : print("Epoch %d, Batch %d completed." % (e, b), msg)
-				if tol is not None and np.abs(loss - loss_prev) < tol:
-					early_stop = True
-					break
-				self._backward(Y_hat, Y_batch, weights=weights)
-				loss_prev = loss
-			if early_stop : break
-		self.fitted_ = True
-		if verbose > 0 : print("Training complete.")
-		return self
-
-	def predict_proba(self, X):
-		"""
-		Predict class probabilities for each sample in `X`.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		Returns
-		-------
-		proba : array-like, shape=(n_samples,)
-			Class probabilities of input data.
-			The order of classes is in sorted ascending order.
-		"""
-		if not self._is_fitted():
-			raise RunTimeError("Model is not fitted")
-		X = check_XY(X=X)
-		if verbose > 0 : print("Predicting %d samples." % \
-								X.shape[0])
-		return self._forward(X)
 
 	def _is_fitted(self):
 		"""
@@ -344,8 +252,8 @@ class NNDT(BaseEstimator):
 			self.sweights_ -= self.regularizer.gradient(self.sweights_)
 			for n in range(len(self.weights_)):
 				self.weights_[n] -= self.regularizer.gradient(self.weights_[n])
-		self.sweights_ -= self.rate * dsW
-		self.sbias_ -= self.rate * dsb
+		self.sweights_ -= self.alpha * dsW
+		self.sbias_ -= self.alpha * dsb
 		for i in range(self.d):
 			z = self._z[-2-i]
 			if i > 0:
@@ -360,8 +268,8 @@ class NNDT(BaseEstimator):
 			n = 2**d + self._s[-2-i] - 1
 			dp = np.einsum('ijk,ik->ik', self._get_weights(n), dZ) # NM2 * N2 -> N2
 			n_count =  np.bincount(n.reshape(-1))
-			self.weights_[n] -= self.rate * dW / n_count[n]
-			self.bias_[n] -= self.rate * db / n_count[n]
+			self.weights_[n] -= self.alpha * dW / n_count[n]
+			self.bias_[n] -= self.alpha * db / n_count[n]
 
 	def _get_weights(self, node):
 		"""

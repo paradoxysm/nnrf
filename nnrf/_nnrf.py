@@ -1,10 +1,10 @@
 import numpy as np
-from sklearn.base import BaseEstimator
+from tqdm import trange
 
-from nnrf import NNDT
+from nnrf import NNDT, NeuralNetwork
 from nnrf.ml import get_loss, get_activation, get_regularizer
 from nnrf.ml.activation import PReLU
-from nnrf.utils import check_XY, one_hot, decode, \
+from nnrf.utils import check_XY, one_hot, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
@@ -47,7 +47,7 @@ class NNRF(BaseEstimator):
 		Must be one of the default regularizers or an object that
 		extends Regularizer. If None, no regularization is done.
 
-	rate : float, default=0.001
+	alpha : float, default=0.001
 		Learning rate. NNDT uses gradient descent.
 
 	max_iter : int, default=10
@@ -79,6 +79,13 @@ class NNRF(BaseEstimator):
 		 - 'balanced': Class weights are automatically calculated as
 						`n_samples / (n_samples * np.bincount(Y))`.
 
+	stack : None, BaseEstimator, 'softmax', default=None
+		Uses a final aggregating estimator to determine
+		classifications. Must be one of:
+		 - None : No stacking, use highest mean probability.
+		 - BaseEstimator : Use `stack` as the estimator.
+		 - 'softmax' : Use a single softmax layer as the estimator.
+
 	verbose : int, default=0
 		Verbosity of estimator; higher values result in
 		more verbose output.
@@ -101,42 +108,35 @@ class NNRF(BaseEstimator):
 	estimators_ : list of NNDT, shape=(n_estimators_)
 		List of all estimators in the NNRF.
 
+	stack_ : BaseEstimator, None
+		Final aggregating stacking model; optional.
+
 	n_classes_ : int
 		Number of classes.
 
 	n_features_ : int
 		Number of features.
-
-	weights_ : ndarray, shape=(2**d, n_classes)
-		Weights of the final softmax layer.
-
-	bias_ : ndarray, shape=(n_classes,)
-		Biases of the final softmax layer.
 	"""
-	def __init__(self, n=50, d=5, r='sqrt', rate=0.001, loss='cross-entropy',
+	def __init__(self, n=50, d=5, r='sqrt', alpha=0.001, loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, max_iter=10, tol=1e-4,
-					bootstrap_size=None, batch_size=None, class_weight=None, softmax=False,
-					verbose=0, warm_start=False, metric='accuracy',
+					bootstrap_size=None, batch_size=None, class_weight=None,
+					stack=None, verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
-		super().__init__(batch_size=batch_size, verbose=verbose,
+		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
+						batch_size=batch_size, verbose=verbose,
 						warm_start=warm_start, class_weight=class_weight,
 						metric=metric, random_state=random_state)
 		self.n = n
 		self.d = d
 		self.r = r
-		self.rate = rate
+		self.alpha = alpha
 		self.activation = get_activation(activation)
-		self.loss = get_loss(loss)
 		self.regularizer = get_regularizer(regularize)
 		self.max_iter = max_iter
 		self.tol = tol
 		self.bootstrap_size = bootstrap_size
-		self.softmax = softmax
+		self.stack_ = stack
 		self.estimators_ = []
-		self.weights_ = np.array([])
-		self.bias_ = np.array([])
-		self.n_classes_ = None
-		self.n_features_ = None
 
 	def _initialize(self):
 		"""
@@ -146,7 +146,7 @@ class NNRF(BaseEstimator):
 		for n in range(self.n):
 			if self.verbose == 0 : verbose = 0
 			else : verbose = self.verbose - 1
-			nndt = NNDT(d=self.d, r=self.r, rate=self.rate, loss=self.loss,
+			nndt = NNDT(d=self.d, r=self.r, alpha=self.alpha, loss=self.loss,
 							activation=self.activation,regularize=self.regularizer,
 							max_iter=self.max_iter, tol=self.tol,
 							batch_size=self.batch_size,
@@ -157,8 +157,8 @@ class NNRF(BaseEstimator):
 			nndt.n_classes_ = self.n_classes_
 			nndt.n_features_ = self.n_features_
 			self.estimators.append(nndt)
-		self.weights_ = self.random_state.randn((self.n*self.n_classes, self.n_classes)) * 0.1
-		self.bias_ = self.random_state.randn(self.n_classes) * 0.1
+		if self.stack_ is 'softmax':
+			self.stack_ = NeuralNetwork(layers=tuple())
 
 	def decision_path(self, X, full=False):
 		"""
@@ -222,8 +222,12 @@ class NNRF(BaseEstimator):
 		bootstrap = self._calculate_bootstrap(len(X))
 		batch_size = self._calculate_batch(len(Y))
 		if not self.warm_start or not self._is_fitted():
-			if verbose > 0 : print("Initializing NNRF")
+			if verbose > 0 : print("Initializing model")
 			self._initialize()
+		if verbose > 0 : print("Training model for %d epochs" % self.max_iter,
+								"on %d samples in batches of %d." % \
+								(X.shape[0], self.batch_size),
+								"Convergence tolerance set to %.4f." % self.tol)
 		if verbose > 0 : print("Training model with %d estimators." % self.n)
 		estimators = range(len(self.estimators_))
 		if verbose == 1 : estimators = trange(len(self.estimators_))
@@ -236,12 +240,14 @@ class NNRF(BaseEstimator):
 			Y_ = data[:bootstrap, X.shape[1]:-1]
 			weights = data[:bootstrap, -1]
 			e.fit(X_, Y_, weights=weights)
-		if self.softmax : self._fit_softmax(X, Y, weights=weights)
+		if self.stack_ is not None:
+			X_ = self.predict_proba(X)
+			self.stack_ = self.stack_.fit(X_, Y, weights=weights)
 		self.fitted_ = True
 		if verbose > 0 : print("Training complete.")
 		return self
 
-	def predict_proba(self, X):
+	def predict_proba(self, X, full=False):
 		"""
 		Predict class probabilities for each sample in `X`.
 
@@ -250,26 +256,32 @@ class NNRF(BaseEstimator):
 		X : array-like, shape=(n_samples, n_features)
 			Data to predict.
 
+		full : bool, default=False
+			Determines if full output from
+			base estimators should be returned.
+
 		Returns
 		-------
-		proba : array-like, shape=(n_samples,)
+		proba : array-like, shape=(n_samples, n_classes)
 			Class probabilities of input data.
 			The order of classes is in sorted ascending order.
+			If `full` is True, this is the full unsynthesized
+			probabilities from all estimators with a shape of
+			(n_samples, n_estimators * n_classes)
 		"""
 		if not self._is_fitted():
 			raise RunTimeError("Model is not fitted")
 		X = check_XY(X=X)
 		if verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
-		if self.softmax:
-			pred = self._predict_base(X)
-			pred, _ = self._predict_softmax(pred)
+		pred = []
+		for e in self.estimators_:
+			pred.append(e.predict_proba(X))
+		pred = np.array(pred)
+		if self.stack_ is None:
+			return np.mean(pred, axis=0)
 		else:
-			pred = np.zeros((len(X), self.n_classes_))
-			for e in self.estimators_:
-				pred += e.predict_proba(X)
-				pred /= self.n
-		return pred
+			return np.concatenate(pred, axis=1)
 
 	def set_warm_start(self, warm):
 		"""
@@ -295,10 +307,10 @@ class NNRF(BaseEstimator):
 			True if the model can be used to predict data.
 		"""
 		estimators = len(self.estimators_) > 0
-		softmax = True
-		if self.softmax:
-			softmax = len(self.weights_) > 0 and len(self.bias_) > 0
-		return estimators and self.fitted_
+		stack = True
+		if self.stack_ is not None:
+			stack = self.stack_._is_fitted()
+		return estimators and stack and self.fitted_
 
 	def _calculate_bootstrap(self, length):
 		"""
@@ -321,130 +333,3 @@ class NNRF(BaseEstimator):
 		elif isinstance(self.bootstrap_size, float) and 0 < self.bootstrap_size <= 1:
 			bootstrap = int(self.bootstrap_size * length)
 		else : raise ValueError("Bootstrap Size must be None, a positive int or float in (0,1]")
-
-	def _fit_softmax(X, Y, weights=None):
-		"""
-		Train the final softmax layer on the given data and labels.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Training data.
-
-		Y : array-like, shape=(n_samples,)
-			Target labels as integers.
-
-		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
-
-		Returns
-		-------
-		self : Base
-			Fitted estimator.
-		"""
-		if self.batch_size is None : self.batch_size = len(Y)
-		X = self._predict_base(X)
-		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(self.batch_size)
-		if verbose > 0 : print("Training softmax aggregation layer")
-		loss_prev, early_stop, e = np.inf, False, 0
-		if verbose == 1 : epochs = trange(self.max_iter)
-		for e in epochs:
-			batches = range(ds.n_batches)
-			if verbose == 2 : batches = trange(batches)
-			if verbose > 2 : print("Epoch %d" % e)
-			for b in batches:
-				X_batch, Y_batch = ds.next()
-				if X_batch == []:
-					if verbose > 0 : print("No more data to train. Ending training.")
-					early_stop = True
-					break
-				Y_hat, Z = self._predict_softmax(X_batch)
-				loss = np.mean(self.loss.loss(Y_hat, Y_batch))
-				metric = self.score(Y_batch, Y_hat=Y_hat, weights=weights)
-				msg = 'loss: %.4f' % loss + ', ' + self.metric.name + ': %.4f' % metric
-				if verbose == 1 : epochs.set_description(msg)
-				if verbose == 2 : batches.set_description(msg)
-				elif verbose > 2 : print("Epoch %d, Batch %d completed." % (e, b), msg)
-				if tol is not None and np.abs(loss - loss_prev) < tol:
-					early_stop = True
-					break
-				self._backward_softmax(Y_hat, Y_batch, Z, X_batch, weights=weights)
-				loss_prev = loss
-			if early_stop : break
-		return self
-
-	def _backward_softmax(Y_hat, Y, Z, X, weights=None):
-		"""
-		Conduct the backward propagation steps through
-		the final softmax layer.
-
-		Parameters
-		----------
-		Y_hat : array-like, shape=(n_samples, n_classes)
-			Softmax output.
-
-		Y : array-like, shape=(n_samples, n_classes)
-			Target labels in one hot encoding.
-
-		Z : array-like, shape=(n_samples, n_classes)
-			Output before softmax activation applied.
-
-		X : array-like, shape=(n_samples, n_estimators * n_classes)
-			Output of base estimators.
-
-		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
-		"""
-		weights = self._calculate_weight(Y, weights=weights)
-		m = len(X)
-		dY = self.loss.gradient(Y_hat, Y) * weights.reshape(-1,1)
-		softmax = get_activation('softmax')
-		dZ = dY * softmax.gradient(Z)
-		dW = np.dot(X.T, dZ) / m
-		db = np.sum(dZ, axis=0) / m
-		if self.regularizer is not None:
-			self.weights_ -= self.regularizer.gradient(self.weights_)
-		self.weights_ -= self.rate * dW
-		self.bias_ -= self.rate * db
-
-	def _predict_base(X):
-		"""
-		Predict class probabilities for each sample in `X`
-		only outputting the raw values of all base estimators.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		Returns
-		-------
-		pred : array-like, shape=(n_samples, n_estimators * n_classes)
-			Output of base estimators.
-		"""
-		pred = np.array([])
-		for e in self.estimators_:
-			pred = np.concatenate((pred, e.predict_proba(X)), axis=1)
-		return pred
-
-	def _predict_softmax(X):
-		"""
-		Conduct forward propagation through the final
-		softmax layer of the NNRF.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		Returns
-		-------
-		A : array-like, shape=(n_samples, n_classes)
-			Softmax activations.
-
-		Z : array-like, shape=(n_samples, n_classes)
-			Output before softmax transformation.
-		"""
-		Z = np.dot(self.weights_, pred) + self.bias_
-		A = get_activation('softmax').activation(Z)
-		return A, Z
