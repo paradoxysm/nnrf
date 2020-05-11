@@ -21,9 +21,8 @@ setup(
     license='BSD-3-Clause',
     packages=find_packages(),
     install_requires=[
-    	'scipy',
-		'sklearn',
-		'numpy'
+		'numpy',
+		'tqdm'
     ],
 	extras_require={
         'test': ['pytest', 'coverage', 'pytest-cov']
