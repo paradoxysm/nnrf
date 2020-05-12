@@ -8,7 +8,7 @@ NNRF is a neural network with random forest structure as detailed by [Wang, S. e
 
 The NNDT is structured like a binary decision tree with each node simulating a split. Furthermore, each node is a visible-hidden hybrid, taking in input from it ancestor node along with *r* features from the data. By training through backpropagation, NNDTs are able to model more powerful splits as well as tune all splits from leaf to root, resulting in better performance compared to traditional decision trees.
 
-The NNRF creates an ensemble of NNDTs that are each trained with bootstrapped data and features, resulting in a powerful model that generalizes well.
+The NNRF creates an ensemble of NNDTs that are each trained with bootstrapped data and features, resulting in a powerful model that generalizes well. `nnrf` also allows NNRFs to be stacked with secondary classifiers that can learn better decision-making models over the basic voting schematic of random forests.
 
 More details regarding `nnrf` can be found in the documentation [here](https://github.com/paradoxysm/nnrf/tree/master/doc).
 
@@ -33,6 +33,27 @@ nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
 # Predict some data
 predictions = nnrf.predict(X_test)
 ```
+
+A secondary classifier can easily be stacked upon the random forest. `nnrf` provides a simple neural network implementation as well as a dynamic ensemble selection method (DES-kNN).
+
+```python
+from nnrf import NNRF, NeuralNetwork, DESKNN
+
+# Create a simple neural network
+nn = NeuralNetwork(layers=(100,))
+# Create and fit an NNRF that feeds into our neural network.
+nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
+p = np.array([])
+for e in self.nnrf.estimators_:
+	p = np.concatenate((p, e.predict_proba(X_stack)), axis=1)
+nn.fit(p, Y_stack)
+
+# We can also create a DES-kNN
+nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
+des = DESKNN(ensemble=nnrf, k=100).fit(X_stack, Y_stack)
+```
+
+DES-kNN is a dynamic ensemble selection model that takes the principle that some estimators in the ensemble perform better for certain regions of data. Using k-nearest neighbors, `nnrf` ranks NNDTs based on performance in the query region and considers this when deciding predictions.
 
 For full details on usage, see the [documentation](https://github.com/paradoxysm/nnrf/tree/master/doc).
 
