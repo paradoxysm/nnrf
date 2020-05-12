@@ -151,7 +151,7 @@ def calculate_weight(self, Y, n_classes, class_weight=None, weights=None):
 	else : raise ValueError("Class Weight must either be a dict or 'balanced' or None")
 	return weights * class_weights
 
-def _calculate_bootstrap(self, bootstrap_size, length):
+def calculate_bootstrap(self, bootstrap_size, length):
 	"""
 	Calculate the bootstrap size for the data of given length.
 
@@ -162,7 +162,7 @@ def _calculate_bootstrap(self, bootstrap_size, length):
 		 - int : Use `bootstrap_size`.
 		 - float : Use `bootstrap_size * n_samples`.
 		 - None : Use `n_samples`.
-	
+
 	length : int
 		Length of the data to be bootstrapped.
 
