@@ -32,7 +32,7 @@ def get_metrics(name):
 	elif name == 'recall' : return Recall()
 	elif name == 'f-score' : return FScore()
 	elif name == 'roc-auc' : return ROCAUC()
-	elif isinstance(name, (None, Metric)) : return name
+	elif isinstance(name, (type(None), Metric)) : return name
 	else : raise ValueError("Invalid metric function")
 
 

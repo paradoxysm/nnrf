@@ -43,7 +43,7 @@ def get_activation(name):
 	elif name == 'elu' : return ELU()
 	elif name == 'noisy-relu' : return NoisyReLU()
 	elif name == 'softmax' : return Softmax()
-	elif isinstance(name, (Activation, None)) : return name
+	elif isinstance(name, (Activation, type(None))) : return name
 	else : raise ValueError("Invalid activation function")
 
 class Activation(Base, ABC):

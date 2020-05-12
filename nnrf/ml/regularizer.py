@@ -27,7 +27,7 @@ def get_regularizer(name):
 	if name == 'l1' : return L1()
 	elif name == 'l2' : return L2()
 	elif name == 'l1-l2' : return L1L2()
-	elif isinstance(name, (None, Regularizer)) : return name
+	elif isinstance(name, (type(None), Regularizer)) : return name
 	else : raise ValueError("Invalid regularizer")
 
 class Regularizer(Base, ABC):

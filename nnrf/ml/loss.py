@@ -31,7 +31,7 @@ def get_loss(name):
 	elif name == 'huber' : return Huber()
 	elif name == 'hinge' : return Hinge()
 	elif name == 'cross-entropy' : return CrossEntropy()
-	elif isinstance(name, (None, LossFunction)) : return name
+	elif isinstance(name, (type(None), LossFunction)) : return name
 	else : raise ValueError("Invalid loss function")
 
 
