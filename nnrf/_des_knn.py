@@ -5,7 +5,7 @@ from nnrf.utils import check_XY, one_hot, decode
 from nnrf.analysis import get_metrics
 
 from nnrf._estimator import BaseEstimator
-from nnrf import NNRF
+
 
 class DESKNN(BaseEstimator):
 	"""
@@ -13,8 +13,9 @@ class DESKNN(BaseEstimator):
 
 	Parameters
 	----------
-	ensemble : BaseEstimator, default=NNRF
+	ensemble : BaseEstimator
 		Ensemble to use for dynamic selection.
+		Needs to be trained.
 
 	k : int, 100
 		Parameter for k-nearest neighbors. Query
@@ -70,7 +71,7 @@ class DESKNN(BaseEstimator):
 		Accuracy scores for each estimator in the ensemble.
 		1 if the estimator was correct, 0 otherwise.
 	"""
-	def __init__(self, ensemble=NNRF(), k=100, leaf_size=40,
+	def __init__(self, ensemble, k=100, leaf_size=40,
 					selection=None, rank=True, verbose=0, warm_start=False,
 					metric='accuracy'):
 		if metric is None : metric = 'accuracy'
@@ -97,7 +98,8 @@ class DESKNN(BaseEstimator):
 			Target labels as integers.
 
 		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
+			Sample weights for ensemble.
+			If None, then samples are equally weighted.
 
 		Returns
 		-------
@@ -105,12 +107,17 @@ class DESKNN(BaseEstimator):
 			Fitted estimator.
 		"""
 		X, Y = check_XY(X=X, Y=Y)
+		if not self.ensemble._is_fitted():
+			raise ValueError("Ensemble must already be trained")
+		if X.shape[1] != self.ensemble.n_features_:
+			raise ValueError("Ensemble accepts data with %d features" % \
+								self.ensemble.n_features_,
+								"but encountered data with %d features." % \
+								X.shape[1])
 		if verbose > 0 : print("Initializing and training model")
-		if self.n_classes_ is None : self.n_classes_ = len(set(Y))
-		if self.n_features_ is None : self.n_features_ = X.shape[1]
+		if self.n_classes_ is None : self.n_classes_ = self.ensemble.n_classes_
+		if self.n_features_ is None : self.n_features_ = self.ensemble.n_features_
 		self.data_ = X
-		if verbose > 2 : print("Training ensemble")
-		self.ensemble.fit(X, Y, weights=None)
 		if verbose > 2 : print("Fitting Nearest Neighbors")
 		self.knn.fit(X)
 		if verbose > 2 : print("Scoring ensemble")
