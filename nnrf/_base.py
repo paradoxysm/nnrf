@@ -2,6 +2,8 @@ import numpy as np
 from tqdm import trange
 from abc import ABC, abstractmethod
 
+from nnrf.utils import calculate_batch
+
 def vars_recurse(obj):
 	"""
 	Recursively collect vars() of the object.
@@ -43,8 +45,9 @@ class Base:
 		"""
 		params = vars(self)
 		for k in params.keys():
-			if isinstance(params[k], Base):
-				params[k] = k.get_params()
+			if hasattr(params[k], 'get_params'):
+				params[k] = dict(list(k.get_params().items()) + \
+								[('type', type(self))])
 			elif isinstance(params[k], np.random.RandomState):
 				params[k] = {'type': np.random.RandomState,
 								'seed': params[k].get_state()}
@@ -79,7 +82,7 @@ class Base:
 				if t == np.random.RandomState:
 					state = v['seed']
 					param = np.random.RandomState().set_state(state)
-				elif 'get_params' in dir(t) and issubclass(t, Base):
+				elif 'set_params' in dir(t):
 					param = t().set_params(v.pop('type'))
 				else:
 					param = t()
@@ -88,8 +91,171 @@ class Base:
 			setattr(self, k, param)
 		return self
 
-
 class BaseEstimator(Base, ABC):
+	"""
+	Base Estimator Class.
+	Implements common methods for estimators.
+
+	Parameters
+	----------
+	verbose : int, default=0
+		Verbosity of estimator; higher values result in
+		more verbose output.
+
+	warm_start : bool, default=False
+		Determines warm starting to allow training to pick
+		up from previous training sessions.
+
+	metric : str, Metric, or None, default='accuracy'
+		Metric for estimator score.
+
+	Attributes
+	----------
+	fitted_ : bool
+		True if the model has been deemed trained and
+		ready to predict new data.
+
+	n_classes_ : int
+		Number of classes.
+
+	n_features : int
+		Number of features accepted as input.
+	"""
+	def __init__(self, verbose=0, warm_start=False, metric='accuracy'):
+		self.verbose = verbose
+		self.warm_start = warm_start
+		self.metric = get_metrics(metric)
+		self.fitted_ = False
+		self.n_classes_ = None
+		self.n_features_ = None
+
+	@abstractmethod
+	def fit(self, X, Y, weights=None):
+		"""
+		Train the model on the given data and labels.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Training data.
+
+		Y : array-like, shape=(n_samples,)
+			Target labels as integers.
+
+		weights : array-like, shape=(n_samples,), default=None
+			Sample weights. If None, then samples are equally weighted.
+
+		Returns
+		-------
+		self : Base
+			Fitted estimator.
+		"""
+		raise NotImplementedError("No fit function implemented")
+
+	def predict(self, X):
+		"""
+		Predict classes for each sample in `X`.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data to predict.
+
+		Returns
+		-------
+		Y : array-like, shape=(n_samples,)
+			Predicted labels.
+		"""
+		pred = self.predict_proba(X)
+		pred = np.argmax(pred, axis=1)
+		return pred
+
+	def predict_log_proba(self, X, *args, **kwargs):
+		"""
+		Predict class log-probabilities for each sample in `X`.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data to predict.
+
+		Returns
+		-------
+		proba : array-like, shape=(n_samples, n_classes)
+			Class log-probabilities of input data.
+			The order of classes is in sorted ascending order.
+		"""
+		return np.log(self.predict_proba(X))
+
+	@abstractmethod
+	def predict_proba(self, X, *args, **kwargs):
+		"""
+		Predict class probabilities for each sample in `X`.
+
+		Parameters
+		----------
+		X : array-like, shape=(n_samples, n_features)
+			Data to predict.
+
+		Returns
+		-------
+		proba : array-like, shape=(n_samples, n_classes)
+			Class probabilities of input data.
+			The order of classes is in sorted ascending order.
+		"""
+		raise NotImplementedError("No predict_proba function implemented")
+
+	def score(self, Y, X=None, Y_hat=None, weights=None):
+		"""
+		Return mean metric of the estimator on the given
+		data/predictions and target labels.
+
+		If both data and predictions are provided, `score`
+		just uses the predictions.
+
+		Parameters
+		----------
+		Y : array-like, shape=(n_samples,)
+			Target labels as integers.
+
+		X : array-like, shape=(n_samples, n_features), default=None
+			Data to predict.
+
+		Y_hat : array-like, shape=(n_samples,), default=None
+			Predicted labels.
+
+		weights : array-like, shape=(n_samples,), default=None
+			Sample weights. If None, then samples are equally weighted.
+
+		Returns
+		-------
+		score : float
+			Mean metric score of the estimator for the given
+			data/labels.
+		"""
+		if X is None and Y_hat is None:
+			raise ValueError("Either X or Y_hat must be provided")
+		elif Y_hat is None:
+			Y_hat = self.predict(X)
+		if self.metric is not None:
+			if weights is None : weights = np.ones(len(Y_hat))
+			return self.metric.score(Y_hat, Y, weights=weights)
+		return 0
+
+	def _is_fitted(self):
+		"""
+		Return True if the model is properly ready
+		for prediction.
+
+		Returns
+		-------
+		fitted : bool
+			True if the model can be used to predict data.
+		"""
+		return self.fitted_
+
+
+class BaseClassifier(BaseEstimator):
 	"""
 	Base Estimator Class.
 	Implements common methods for estimators.
@@ -142,22 +308,23 @@ class BaseEstimator(Base, ABC):
 	fitted_ : bool
 		True if the model has been deemed trained and
 		ready to predict new data.
+
+	n_classes_ : int
+		Number of classes.
+
+	n_features : int
+		Number of features accepted as input.
 	"""
 	def __init__(self, loss='cross-entropy', max_iter=100, tol=1e-4,
 					batch_size=None, verbose=0, warm_start=False,
 					class_weight=None, metric='accuracy', random_state=None):
+		super().__init__(verbose=0, warm_start=False, metric='accuracy')
 		self.loss = get_loss(loss)
 		self.max_iter = max_iter
 		self.tol = tol
 		self.batch_size = batch_size
-		self.verbose = verbose
-		self.warm_start = warm_start
-		self.metric = get_metrics(metric)
 		self.class_weight = class_weight
 		self.random_state = create_random_state(seed=random_state)
-		self.fitted_ = False
-		self.n_classes_ = None
-		self.n_features_ = None
 		self._x = []
 		self._z = []
 
@@ -186,7 +353,7 @@ class BaseEstimator(Base, ABC):
 		if self.n_features_ is None : self.n_features_ = X.shape[1]
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
-		batch_size = self._calculate_batch(len(Y))
+		batch_size = calculate_batch(self.batch_size, len(Y))
 		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(self.batch_size)
 		if not self.warm_start or not self._is_fitted():
 			if verbose > 0 : print("Initializing model")
@@ -224,41 +391,6 @@ class BaseEstimator(Base, ABC):
 		self.fitted_ = True
 		if verbose > 0 : print("Training complete.")
 		return self
-
-	def predict(self, X):
-		"""
-		Predict classes for each sample in `X`.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		Returns
-		-------
-		Y : array-like, shape=(n_samples,)
-			Predicted labels.
-		"""
-		pred = self.predict_proba(X)
-		pred = np.argmax(pred, axis=1)
-		return pred
-
-	def predict_log_proba(self, X, *args, **kwargs):
-		"""
-		Predict class log-probabilities for each sample in `X`.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		Returns
-		-------
-		proba : array-like, shape=(n_samples, n_classes)
-			Class log-probabilities of input data.
-			The order of classes is in sorted ascending order.
-		"""
-		return np.log(self.predict_proba(X))
 
 	def predict_proba(self, X, *args, **kwargs):
 		"""
@@ -319,18 +451,7 @@ class BaseEstimator(Base, ABC):
 			return self.metric.score(Y_hat, Y, weights=weights)
 		return 0
 
-	def _is_fitted(self):
-		"""
-		Return True if the model is properly ready
-		for prediction.
-
-		Returns
-		-------
-		fitted : bool
-			True if the model can be used to predict data.
-		"""
-		return self.fitted_
-
+	@abstractmethod
 	def _forward(self, X, *args, **kwargs):
 		"""
 		Conduct the forward propagation steps through the model.
@@ -345,7 +466,7 @@ class BaseEstimator(Base, ABC):
 		Y_hat : array-like, shape=(n_samples, n_classes)
 			Output.
 		"""
-		return self.predict_proba(X)
+		raise NotImplementedError("No forward propagation implemented")
 
 	def _backward(self, Y_hat, Y, *args, weights=None, **kwargs):
 		"""
@@ -364,57 +485,3 @@ class BaseEstimator(Base, ABC):
 			Sample weights. If None, then samples are equally weighted.
 		"""
 		return
-
-	def _calculate_batch(self, length):
-		"""
-		Calculate the batch size for the data of given length.
-
-		Parameters
-		----------
-		length : int
-			Length of the data to be batched.
-
-		Returns
-		-------
-		batch_size : int
-			Batch size.
-		"""
-		if self.batch_size is None : return length
-		elif isinstance(self.batch_size, int) and self.batch_size > 0 and \
-				self.batch_size <= length:
-			return self.batch_size
-		elif isinstance(self.batch_size, float) and 0 < self.batch_size <= 1:
-			return int(self.batch_size * length)
-		else:
-			raise ValueError("Batch size must be None, an int less than %d," % length,
-								"or a float within (0,1]")
-
-	def _calculate_weight(self, Y, weights=None):
-		"""
-		Calculate the weights applied to the predicted labels,
-		combining class weights and sample weights.
-
-		Parameters
-		----------
-		Y : array-like, shape=(n_samples,)
-			Target labels as integers.
-
-		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
-
-		Returns
-		-------
-		weights : array-like, shape=(n_samples,)
-			Weights combining sample weights and class weights.
-		"""
-		if weights is None : weights = np.ones(len(Y))
-		d = self.class_weight
-		if isinstance(d, str) and d == 'balanced':
-			l = len(Y) / (self.n_classes * np.bincount(Y))
-			d = {k: l[k] for k in range(len(l))}
-		elif isinstance(d, dict):
-			k = list(d.keys())
-			class_weights = np.where(Y == k, self.class_weight[k])
-		elif d is None : class_weights = np.ones(len(Y))
-		else : raise ValueError("Class Weight must either be a dict or 'balanced' or None")
-		return weights * class_weights

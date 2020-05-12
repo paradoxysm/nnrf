@@ -2,14 +2,14 @@ import numpy as np
 
 from nnrf.ml import get_activation, get_regularizer
 from nnrf.ml.activation import PReLU
-from nnrf.utils import check_XY, one_hot, decode, \
+from nnrf.utils import check_XY, one_hot, decode, calculate_weight, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._base import BaseEstimator
+from nnrf._base import BaseClassifier
 
 
-class NNDT(BaseEstimator):
+class NNDT(BaseClassifier):
 	"""
 	Neural Network structured as a Decision Tree.
 
@@ -88,6 +88,10 @@ class NNDT(BaseEstimator):
 
 	n_features_ : int
 		Number of features.
+
+	fitted_ : bool
+		True if the model has been deemed trained and
+		ready to predict new data.
 
 	weights_ : ndarray, shape=(2**d - 1, r + 1, 2)
 		Weights of the NNDT. Note that the root input node
@@ -238,7 +242,8 @@ class NNDT(BaseEstimator):
 		weights : array-like, shape=(n_samples,), default=None
 			Sample weights. If None, then samples are equally weighted.
 		"""
-		weights = self._calculate_weight(decode(Y), weights=weights)
+		weights = calculate_weight(decode(Y), self.n_classes_,
+					class_weight=self.class_weight, weights=weights)
 		dY = self.loss.gradient(Y_hat, Y) * weights.reshape(-1,1)
 		dsZ = dY * self.softmax.gradient(self._z[-1]) # NC
 		dsW = np.dot(self._p[-1].T, dsZ) / len(Y_hat) # (2**d)C

@@ -4,14 +4,15 @@ from tqdm import trange
 from nnrf import NNDT, NeuralNetwork
 from nnrf.ml import get_loss, get_activation, get_regularizer
 from nnrf.ml.activation import PReLU
-from nnrf.utils import check_XY, one_hot, \
+from nnrf.utils import check_XY, one_hot, calculate_batch, \
+						calculate_bootstrap, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._base import BaseEstimator
+from nnrf._base import BaseClassifier
 
 
-class NNRF(BaseEstimator):
+class NNRF(BaseClassifier):
 	"""
 	Neural Network structured as a Decision Tree.
 
@@ -62,10 +63,6 @@ class NNRF(BaseEstimator):
 		 - float : Use `bootstrap_size * n_samples`.
 		 - None : Use `n_samples`.
 
-	softmax : bool, default=False
-		Determines if a final softmax layer is applied to
-		aggregate all output from all base estimators.
-
 	batch_size : int, float, default=None
 		Batch size for training. Must be one of:
 		 - int : Use `batch_size`.
@@ -78,13 +75,6 @@ class NNRF(BaseEstimator):
 		 - None : All classes have a weight of one.
 		 - 'balanced': Class weights are automatically calculated as
 						`n_samples / (n_samples * np.bincount(Y))`.
-
-	stack : None, BaseEstimator, 'softmax', default=None
-		Uses a final aggregating estimator to determine
-		classifications. Must be one of:
-		 - None : No stacking, use highest mean probability.
-		 - BaseEstimator : Use `stack` as the estimator.
-		 - 'softmax' : Use a single softmax layer as the estimator.
 
 	verbose : int, default=0
 		Verbosity of estimator; higher values result in
@@ -108,19 +98,20 @@ class NNRF(BaseEstimator):
 	estimators_ : list of NNDT, shape=(n_estimators_)
 		List of all estimators in the NNRF.
 
-	stack_ : BaseEstimator, None
-		Final aggregating stacking model; optional.
-
 	n_classes_ : int
 		Number of classes.
 
 	n_features_ : int
 		Number of features.
+
+	fitted_ : bool
+		True if the model has been deemed trained and
+		ready to predict new data.
 	"""
 	def __init__(self, n=50, d=5, r='sqrt', alpha=0.001, loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, max_iter=10, tol=1e-4,
 					bootstrap_size=None, batch_size=None, class_weight=None,
-					stack=None, verbose=0, warm_start=False, metric='accuracy',
+					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
 		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
 						batch_size=batch_size, verbose=verbose,
@@ -135,7 +126,6 @@ class NNRF(BaseEstimator):
 		self.max_iter = max_iter
 		self.tol = tol
 		self.bootstrap_size = bootstrap_size
-		self.stack_ = stack
 		self.estimators_ = []
 
 	def _initialize(self):
@@ -157,8 +147,6 @@ class NNRF(BaseEstimator):
 			nndt.n_classes_ = self.n_classes_
 			nndt.n_features_ = self.n_features_
 			self.estimators.append(nndt)
-		if self.stack_ is 'softmax':
-			self.stack_ = NeuralNetwork(layers=tuple())
 
 	def decision_path(self, X, full=False):
 		"""
@@ -219,8 +207,8 @@ class NNRF(BaseEstimator):
 		self.n_features_ = X.shape[1]
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
-		bootstrap = self._calculate_bootstrap(len(X))
-		batch_size = self._calculate_batch(len(Y))
+		bootstrap = calculate_bootstrap(self.bootstrap_size, len(X))
+		batch_size = calculate_batch(self.batch_size, len(Y))
 		if not self.warm_start or not self._is_fitted():
 			if verbose > 0 : print("Initializing model")
 			self._initialize()
@@ -240,48 +228,9 @@ class NNRF(BaseEstimator):
 			Y_ = data[:bootstrap, X.shape[1]:-1]
 			weights = data[:bootstrap, -1]
 			e.fit(X_, Y_, weights=weights)
-		if self.stack_ is not None:
-			X_ = self.predict_proba(X)
-			self.stack_ = self.stack_.fit(X_, Y, weights=weights)
 		self.fitted_ = True
 		if verbose > 0 : print("Training complete.")
 		return self
-
-	def predict_proba(self, X, full=False):
-		"""
-		Predict class probabilities for each sample in `X`.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to predict.
-
-		full : bool, default=False
-			Determines if full output from
-			base estimators should be returned.
-
-		Returns
-		-------
-		proba : array-like, shape=(n_samples, n_classes)
-			Class probabilities of input data.
-			The order of classes is in sorted ascending order.
-			If `full` is True, this is the full unsynthesized
-			probabilities from all estimators with a shape of
-			(n_samples, n_estimators * n_classes)
-		"""
-		if not self._is_fitted():
-			raise RunTimeError("Model is not fitted")
-		X = check_XY(X=X)
-		if verbose > 0 : print("Predicting %d samples." % \
-								X.shape[0])
-		pred = []
-		for e in self.estimators_:
-			pred.append(e.predict_proba(X))
-		pred = np.array(pred)
-		if self.stack_ is None:
-			return np.mean(pred, axis=0)
-		else:
-			return np.concatenate(pred, axis=1)
 
 	def set_warm_start(self, warm):
 		"""
@@ -307,29 +256,24 @@ class NNRF(BaseEstimator):
 			True if the model can be used to predict data.
 		"""
 		estimators = len(self.estimators_) > 0
-		stack = True
-		if self.stack_ is not None:
-			stack = self.stack_._is_fitted()
-		return estimators and stack and self.fitted_
+		return estimators and self.fitted_
 
-	def _calculate_bootstrap(self, length):
+	def _forward(self, X):
 		"""
-		Calculate the bootstrap size for the data of given length.
+		Conduct the forward propagation steps through the model.
 
 		Parameters
 		----------
-		length : int
-			Length of the data to be bootstrapped.
+		X : array-like, shape=(n_samples, n_features)
+			Data to predict.
 
 		Returns
 		-------
-		bootstrap_size : int
-			Bootstrap size.
+		Y_hat : array-like, shape=(n_samples, n_classes)
+			Output.
 		"""
-		if self.bootstrap_size is None:
-			bootstrap = length
-		elif isinstance(self.bootstrap_size, int) and self.bootstrap > 0:
-			bootstrap = self.bootstrap_size
-		elif isinstance(self.bootstrap_size, float) and 0 < self.bootstrap_size <= 1:
-			bootstrap = int(self.bootstrap_size * length)
-		else : raise ValueError("Bootstrap Size must be None, a positive int or float in (0,1]")
+		pred = []
+		for e in self.estimators_:
+			pred.append(e.predict_proba(X))
+		pred = np.array(pred)
+		return np.mean(pred, axis=0)

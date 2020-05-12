@@ -1,13 +1,13 @@
 import numpy as np
 
 from nnrf.ml import get_loss, get_activation, get_regularizer
-from nnrf.utils import check_XY, one_hot, decode, \
+from nnrf.utils import check_XY, one_hot, decode, calculate_weight, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._base import BaseEstimator
+from nnrf._base import BaseClassifier
 
-class NeuralNetwork(BaseEstimator):
+class NeuralNetwork(BaseClassifier):
 	"""
 	Basic Neural Network.
 
@@ -81,6 +81,10 @@ class NeuralNetwork(BaseEstimator):
 
 	n_features_ : int
 		Number of features.
+
+	fitted_ : bool
+		True if the model has been deemed trained and
+		ready to predict new data.
 
 	weights_ : list of ndarray, shape=(layers,)
 		Weights of the model.
@@ -181,7 +185,8 @@ class NeuralNetwork(BaseEstimator):
 		weights : array-like, shape=(n_samples,), default=None
 			Sample weights. If None, then samples are equally weighted.
 		"""
-		weights = self._calculate_weight(decode(Y), weights=weights)
+		weights = calculate_weight(decode(Y), self.n_classes_,
+					class_weight=self.class_weight, weights=weights)
 		m = len(Y)
 		dY = self.loss.gradient(Y_hat, Y) * weights.reshape(-1,1)
 		for l in range(self.n_layers - 1, -1, -1):
