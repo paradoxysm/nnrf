@@ -4,7 +4,7 @@ from sklearn.neighbors import NearestNeighbors
 from nnrf.utils import check_XY, one_hot, decode
 from nnrf.analysis import get_metrics
 
-from nnrf._estimator import BaseEstimator
+from nnrf.utils._estimator import BaseEstimator
 
 
 class DESKNN(BaseEstimator):

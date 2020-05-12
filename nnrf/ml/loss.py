@@ -1,7 +1,7 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
-from nnrf._base import Base
+from nnrf.utils._base import Base
 
 def get_loss(name):
 	"""

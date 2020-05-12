@@ -5,7 +5,7 @@ from nnrf.utils import check_XY, one_hot, decode, calculate_weight, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._estimator import BaseClassifier
+from nnrf.utils._estimator import BaseClassifier
 
 class NeuralNetwork(BaseClassifier):
 	"""

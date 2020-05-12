@@ -9,7 +9,7 @@ from nnrf.utils import check_XY, one_hot, calculate_batch, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
 
-from nnrf._estimator import BaseClassifier
+from nnrf.utils._estimator import BaseClassifier
 
 
 class NNRF(BaseClassifier):

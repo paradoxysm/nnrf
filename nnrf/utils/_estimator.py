@@ -7,7 +7,7 @@ from nnrf.utils import calculate_batch, create_random_state, \
 from nnrf.analysis import get_metrics
 from nnrf.ml import get_loss
 
-from nnrf._base import Base
+from nnrf.utils._base import Base
 
 class BaseEstimator(Base, ABC):
 	"""

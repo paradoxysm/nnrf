@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from sklearn import metrics
 
-from nnrf._base import Base
 from nnrf.utils import one_hot, decode
+from nnrf.utils._base import Base
 
 def get_metrics(name):
 	"""
