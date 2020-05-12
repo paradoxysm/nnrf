@@ -1,7 +1,8 @@
-import numpy as np
 from abc import ABC, abstractmethod
+from sklearn import metrics
 
 from nnrf._base import Base
+from nnrf.utils import one_hot, decode
 
 def get_metrics(name):
 	"""
@@ -110,31 +111,10 @@ class Accuracy(Metric):
 		super().__init__()
 		self.name = "accuracy"
 
-	def calculate(self, Y_hat, Y, average='micro', weights=None):
+	def calculate(self, Y_hat, Y, weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		if weights is None : weights = np.ones(len(Y_hat)) / len(Y_hat)
-		elif weights.shape != Y_hat.shape:
-			raise ValueError("Weights must be the same shape as labels.",
-								"Expected", str(Y_hat.shape), " but got",
-								weights.shape)
-		else : weights /= np.sum(weights)
-		if average is 'micro':
-			return (Y_hat == Y).all(axis=0).mean()
-		elif average is None or average == 'macro' or average == 'weighted':
-			classes = sorted(set(Y))
-			accuracies = {c: 0 for c in classes}
-			supports = {c: 0 for c in classes}
-			for l, t, w in zip(Y_hat_, Y, weights):
-				supports[t] += 1
-				if l == t : accuracies[t] += w
-			if average is None : return accuracies
-			accuracies = [accuracies[c] for c in classes]
-			weights = None
-			if average == 'weighted':
-				weights = [supports[c] for c in classes]
-				if np.sum(weights) == 0:
-					return 0
-			return np.average(accuracies, weights=weights)
+		Y_hat, Y = decode(Y_hat), decode(Y)
+		return metrics.accuracy_score(Y, Y_hat, sample_weight=weights)
 
 class Precision(Metric):
 	"""
@@ -144,9 +124,11 @@ class Precision(Metric):
 		super().__init__()
 		self.name = "precision"
 
-	def calculate(self, Y_hat_, Y, average='micro', weights=None):
-		pass
-
+	def calculate(self, Y_hat, Y, average='micro', weights=None):
+		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
+		Y_hat, Y = decode(Y_hat), decode(Y)
+		return metrics.precision_score(Y, Y_hat, average=average,
+										sample_weight=weights)
 
 class Recall(Metric):
 	"""
@@ -156,9 +138,11 @@ class Recall(Metric):
 		super().__init__()
 		self.name = "recall"
 
-	def calculate(self, Y_hat_, Y, average='micro', weights=None):
-		pass
-
+	def calculate(self, Y_hat, Y, average='micro', weights=None):
+		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
+		Y_hat, Y = decode(Y_hat), decode(Y)
+		return metrics.recall_score(Y, Y_hat, average=average,
+										sample_weight=weights)
 
 class FScore(Metric):
 	"""
@@ -174,17 +158,24 @@ class FScore(Metric):
 		self.name = "f-score"
 		self.beta = beta
 
-	def calculate(self, Y_hat_, Y, average='micro', weights=None):
-		pass
-
+	def calculate(self, Y_hat, Y, average='micro', weights=None):
+		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
+		Y_hat, Y = decode(Y_hat), decode(Y)
+		return metrics.fbeta_score(Y, Y_hat, self.beta, average=average,
+									sample_weight=weights)
 
 class ROCAUC(Metric):
 	"""
 	Area under the Receiver Operative Curve (ROC AUC) Metric.
 	"""
-	def __init__(self):
+	def __init__(self, multi_class='ovr'):
 		super().__init__()
 		self.name = 'roc-auc'
+		self.multi_class = multi_class
 
-	def calculate(self, Y_hat_, Y, average='micro', weights=None):
-		pass
+	def calculate(self, Y_hat, Y, average='macro', weights=None):
+		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
+		Y_hat, Y = decode(Y_hat), decode(Y)
+		return metrics.roc_auc_score(Y, Y_hat, average=average,
+									multi_class=self.multi_class,
+									sample_weight=weights)
