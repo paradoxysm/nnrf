@@ -22,7 +22,8 @@ setup(
     packages=find_packages(),
     install_requires=[
 		'numpy',
-		'tqdm'
+		'tqdm',
+		'sklearn'
     ],
 	extras_require={
         'test': ['pytest', 'coverage', 'pytest-cov']
