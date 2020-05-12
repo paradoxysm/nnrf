@@ -48,7 +48,7 @@ class BaseEstimator(Base, ABC):
 		self.n_features_ = None
 
 	@abstractmethod
-	def fit(self, X, Y, weights=None):
+	def fit(self, X, Y, *args, weights=None, **kwargs):
 		"""
 		Train the model on the given data and labels.
 
@@ -88,7 +88,7 @@ class BaseEstimator(Base, ABC):
 		pred = np.argmax(pred, axis=1)
 		return pred
 
-	def predict_log_proba(self, X, *args, **kwargs):
+	def predict_log_proba(self, X):
 		"""
 		Predict class log-probabilities for each sample in `X`.
 
@@ -247,13 +247,13 @@ class BaseClassifier(BaseEstimator):
 		self._z = []
 
 	@abstractmethod
-	def _initialize(self):
+	def _initialize(self, *args, **kwargs):
 		"""
 		Initialize the parameters of the NNRF.
 		"""
 		raise NotImplementedError("No initialize function implemented")
 
-	def fit(self, X, Y, weights=None):
+	def fit(self, X, Y, *args, weights=None, **kwargs):
 		"""
 		Train the model on the given data and labels.
 
