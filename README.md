@@ -44,7 +44,7 @@ nn = NeuralNetwork(layers=(100,))
 # Create and fit an NNRF that feeds into our neural network.
 nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
 p = np.array([])
-for e in self.nnrf.estimators_:
+for e in nnrf.estimators_:
 	p = np.concatenate((p, e.predict_proba(X_stack)), axis=1)
 nn.fit(p, Y_stack)
 
