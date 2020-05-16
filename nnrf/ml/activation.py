@@ -12,7 +12,6 @@ def get_activation(name):
 	name : Activation, None, str
 		Activation to look up. Must be one of:
 		 - 'linear' : Linear.
-		 - 'exponential' : Exponential.
 		 - 'binary' : Binary.
 		 - 'sigmoid' : Sigmoid.
 		 - 'tanh' : Tanh.
@@ -33,7 +32,6 @@ def get_activation(name):
 		The activation function.
 	"""
 	if name == 'linear' : return Linear()
-	elif name == 'exponential' : return Exponential()
 	elif name == 'binary' : return Binary()
 	elif name == 'sigmoid' : return Sigmoid()
 	elif name == 'tanh' : return Tanh()
@@ -149,8 +147,7 @@ class Binary(Activation):
 		return np.where(X < 0, 0, 1)
 
 	def gradient(self, X):
-		if 0 in X : raise Warning("0 encountered in data, resulting in NaN.")
-		return np.where(X != 0, 0, np.nan)
+		return np.zeros(X.shape)
 
 	def classify(self, X):
 		return X
@@ -173,7 +170,7 @@ class Sigmoid(Activation):
 		return 1 / (1 + np.exp(-X))
 
 	def gradient(self, X):
-		sig = sigmoid(X, axis=axis)
+		sig = self.activation(X)
 		return sig * (1 - sig)
 
 	def classify(self, X):
@@ -198,7 +195,7 @@ class Tanh(Activation):
 		return 2 / (1 + np.exp(-2 * X)) - 1
 
 	def gradient(self, X):
-		return 1 - np.square(tanh(X, axis=axis))
+		return 1 - np.square(self.activation(X))
 
 	def classify(self, X):
 		raise Warning("Tanh should not be used for classification")
@@ -301,7 +298,7 @@ class ELU(ReLU):
 		return np.where(X < 0, self.a * (np.exp(X) - 1), X)
 
 	def gradient(self, X):
-		return np.where(X > 0, 1, elu(X, self.a, axis=axis))
+		return np.where(X > 0, 1, np.exp(X))
 
 	def classify(self, X):
 		raise Warning("LeakyReLU should not be used for classification, using ReLU instead")
