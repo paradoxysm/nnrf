@@ -96,7 +96,8 @@ class NeuralNetwork(BaseClassifier):
 					alpha=0.001, batch_size=None, max_iter=10, tol=1e-4,
 					random_state=None, regularize=None, class_weight=None,
 					metric='accuracy', verbose=0, warm_start=False):
-		super().__init__(batch_size=batch_size, verbose=verbose,
+		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
+						batch_size=batch_size, verbose=verbose,
 						warm_start=warm_start, class_weight=class_weight,
 						metric=metric, random_state=random_state)
 		self.activation = get_activation(activation)
@@ -116,18 +117,19 @@ class NeuralNetwork(BaseClassifier):
 		Initialize the parameters of the neural network.
 		"""
 		if self.layers == tuple():
-			self.weights_ = [self.random_state.randn((self.n_features_, self.n_classes_)) * 0.1]
-			self.bias_ = [self.random_state.randn((self.n_classes_)) * 0.1]
+			self.weights_ = [self.random_state.randn(self.n_features_, self.n_classes_) * 0.1]
+			self.bias_ = [self.random_state.randn(self.n_classes_) * 0.1]
 			self.n_layers_ = 1
 			self.layers = (self.n_features,)
 			return
-		self.weights_.append(self.random_state.randn((self.n_features_, self.layers[0])) * 0.1)
-		self.bias_.append(self.random_state.randn(layers[0]))
+		self.weights_.append(self.random_state.randn(self.n_features_, self.layers[0]) * 0.1)
+		self.bias_.append(self.random_state.randn(self.layers[0]))
 		for l in range(self.n_layers_ - 1):
-			self.weights_.append(self.random_state.randn((self.layers[l], self.layers[l+1])) * 0.1)
-			self.bias_.append(self.random_state.randn(self.layers[l]))
-		self.weights_.append(self.random_state.randn((self.layers[-1], self.n_classes_)) * 0.1)
+			self.weights_.append(self.random_state.randn(self.layers[l], self.layers[l+1]) * 0.1)
+			self.bias_.append(self.random_state.randn(self.layers[l+1]))
+		self.weights_.append(self.random_state.randn(self.layers[-1], self.n_classes_) * 0.1)
 		self.bias_.append(self.random_state.randn(self.n_classes_) * 0.1)
+		self.n_layers_ += 1
 
 	def _is_fitted(self):
 		"""
@@ -160,9 +162,9 @@ class NeuralNetwork(BaseClassifier):
 		"""
 		self._x, self._z = [], []
 		X_ = X
-		for l in range(self.n_layers):
-			Z = np.dot(self.weights_[l], X_) + self.bias_[l]
-			if l < self.n_layers - 1 : A = self.activation.activation(Z)
+		for l in range(self.n_layers_):
+			Z = np.dot(X_, self.weights_[l]) + self.bias_[l]
+			if l < self.n_layers_ - 1 : A = self.activation.activation(Z)
 			else : A = self.softmax.activation(Z)
 			self._z.append(Z)
 			self._x.append(X_)
@@ -189,11 +191,11 @@ class NeuralNetwork(BaseClassifier):
 					class_weight=self.class_weight, weights=weights)
 		m = len(Y)
 		dY = self.loss.gradient(Y_hat, Y) * weights.reshape(-1,1)
-		for l in range(self.n_layers - 1, -1, -1):
-			if l == self.n_layers - 1:
+		for l in range(self.n_layers_ - 1, -1, -1):
+			if l == self.n_layers_ - 1:
 				dZ = dY * self.softmax.gradient(self._z[-1])
 			else : dZ = dY * self.activation.gradient(self._z[l])
-			dW = np.dot(self._x[l], dZ) / m
+			dW = np.dot(self._x[l].T, dZ) / m
 			db = np.sum(dZ, axis=0) / m
 			if self.regularizer is not None:
 				self.weights_[l] -= self.regularizer.gradient(self.weights_[l])
