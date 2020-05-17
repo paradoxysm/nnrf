@@ -3,7 +3,7 @@ from tqdm import trange
 from abc import ABC, abstractmethod
 
 from nnrf.utils import calculate_batch, create_random_state, \
-						BatchDataset, one_hot, check_XY
+						BatchDataset, one_hot, decode, check_XY
 from nnrf.analysis import get_metrics
 from nnrf.ml import get_loss
 
@@ -236,7 +236,8 @@ class BaseClassifier(BaseEstimator):
 	def __init__(self, loss='cross-entropy', max_iter=100, tol=1e-4,
 					batch_size=None, verbose=0, warm_start=False,
 					class_weight=None, metric='accuracy', random_state=None):
-		super().__init__(verbose=0, warm_start=False, metric='accuracy')
+		super().__init__(verbose=verbose, warm_start=warm_start,
+							metric=metric)
 		self.loss = get_loss(loss)
 		self.max_iter = max_iter
 		self.tol = tol
@@ -274,39 +275,39 @@ class BaseClassifier(BaseEstimator):
 			Fitted estimator.
 		"""
 		X, Y = check_XY(X=X, Y=Y)
-		if self.n_classes_ is None : self.n_classes_ = len(set(Y))
+		if self.n_classes_ is None : self.n_classes_ = len(set(decode(Y)))
 		if self.n_features_ is None : self.n_features_ = X.shape[1]
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
 		batch_size = calculate_batch(self.batch_size, len(Y))
-		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(self.batch_size)
+		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(batch_size)
 		if not self.warm_start or not self._is_fitted():
-			if verbose > 0 : print("Initializing model")
+			if self.verbose > 0 : print("Initializing model")
 			self._initialize()
-		if verbose > 0 : print("Training model for %d epochs" % self.max_iter,
+		if self.verbose > 0 : print("Training model for %d epochs" % self.max_iter,
 								"on %d samples in batches of %d." % \
-								(X.shape[0], self.batch_size),
-								"Convergence tolerance set to %.4f." % self.tol)
+								(X.shape[0], batch_size),
+								"Convergence tolerance set to %f." % self.tol)
 		loss_prev, early_stop, e = np.inf, False, 0
 		epochs = range(self.max_iter)
-		if verbose == 1 : epochs = trange(self.max_iter)
+		if self.verbose == 1 : epochs = trange(self.max_iter)
 		for e in epochs:
 			batches = range(ds.n_batches)
-			if verbose == 2 : batches = trange(batches)
-			if verbose > 2 : print("Epoch %d" % e)
+			if self.verbose == 2 : batches = trange(batches)
+			if self.verbose > 2 : print("Epoch %d" % e)
 			for b in batches:
 				X_batch, Y_batch = ds.next()
-				if X_batch == []:
-					if verbose > 0 : print("No more data to train. Ending training.")
+				if len(X_batch) == 0:
+					if self.verbose > 0 : print("No more data to train. Ending training.")
 					early_stop = True
 					break
 				Y_hat = self._forward(X_batch)
-				loss = np.mean(self.loss.loss(Y_hat, Y_batch))
+				loss = np.mean(np.sum(self.loss.loss(Y_hat, Y_batch), axis=1))
 				metric = self.score(Y_batch, Y_hat=Y_hat, weights=weights)
 				msg = 'loss: %.4f' % loss + ', ' + self.metric.name + ': %.4f' % metric
-				if verbose == 1 : epochs.set_description(msg)
-				elif verbose == 2 : batches.set_description(msg)
-				elif verbose > 2 : print("Epoch %d, Batch %d completed." % (e, b), msg)
+				if self.verbose == 1 : epochs.set_description(msg)
+				elif self.verbose == 2 : batches.set_description(msg)
+				elif self.verbose > 2 : print("Epoch %d, Batch %d completed." % (e, b), msg)
 				if self.tol is not None and np.abs(loss - loss_prev) < self.tol:
 					early_stop = True
 					break
@@ -314,7 +315,7 @@ class BaseClassifier(BaseEstimator):
 				loss_prev = loss
 			if early_stop : break
 		self.fitted_ = True
-		if verbose > 0 : print("Training complete.")
+		if self.verbose > 0 : print("Training complete.")
 		return self
 
 	def predict_proba(self, X, *args, **kwargs):
@@ -335,7 +336,7 @@ class BaseClassifier(BaseEstimator):
 		if not self._is_fitted():
 			raise RunTimeError("Model is not fitted")
 		X = check_XY(X=X)
-		if verbose > 0 : print("Predicting %d samples." % \
+		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
 		return self._forward(X)
 
