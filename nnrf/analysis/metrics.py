@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from sklearn import metrics
+import numpy as np
 
-from nnrf.utils import one_hot, decode
+from nnrf.utils import one_hot, check_XY
 from nnrf.utils._base import Base
 
 def get_metrics(name):
@@ -113,7 +114,7 @@ class Accuracy(Metric):
 
 	def calculate(self, Y_hat, Y, weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		Y_hat, Y = decode(Y_hat), decode(Y)
+		Y_hat, Y = np.argmax(Y_hat, axis=1), np.argmax(Y, axis=1)
 		return metrics.accuracy_score(Y, Y_hat, sample_weight=weights)
 
 class Precision(Metric):
@@ -126,7 +127,7 @@ class Precision(Metric):
 
 	def calculate(self, Y_hat, Y, average='micro', weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		Y_hat, Y = decode(Y_hat), decode(Y)
+		Y_hat, Y = np.argmax(Y_hat, axis=1), np.argmax(Y, axis=1)
 		return metrics.precision_score(Y, Y_hat, average=average,
 										sample_weight=weights)
 
@@ -140,7 +141,7 @@ class Recall(Metric):
 
 	def calculate(self, Y_hat, Y, average='micro', weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		Y_hat, Y = decode(Y_hat), decode(Y)
+		Y_hat, Y = np.argmax(Y_hat, axis=1), np.argmax(Y, axis=1)
 		return metrics.recall_score(Y, Y_hat, average=average,
 										sample_weight=weights)
 
@@ -160,7 +161,7 @@ class FScore(Metric):
 
 	def calculate(self, Y_hat, Y, average='micro', weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		Y_hat, Y = decode(Y_hat), decode(Y)
+		Y_hat, Y = np.argmax(Y_hat, axis=1), np.argmax(Y, axis=1)
 		return metrics.fbeta_score(Y, Y_hat, self.beta, average=average,
 									sample_weight=weights)
 
@@ -175,7 +176,7 @@ class ROCAUC(Metric):
 
 	def calculate(self, Y_hat, Y, average='macro', weights=None):
 		Y_hat, Y = check_XY(X=Y_hat, Y=Y)
-		Y_hat, Y = decode(Y_hat), decode(Y)
+		Y_hat, Y = np.argmax(Y_hat, axis=1), np.argmax(Y, axis=1)
 		return metrics.roc_auc_score(Y, Y_hat, average=average,
 									multi_class=self.multi_class,
 									sample_weight=weights)
