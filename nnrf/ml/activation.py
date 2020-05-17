@@ -88,15 +88,18 @@ class Activation(Base, ABC):
 		"""
 		raise NotImplementedError("No gradient function implemented")
 
-	def scale(self, Y, loss, *args, **kwargs):
+	def scale(self, Y, scale, *args, **kwargs):
 		"""
 		Scale `Y` to the scale given by the LossFunction
 		`loss`.
 
 		Parameters
 		----------
-		X : array-like, shape=(n_samples, n_features)
+		Y : array-like, shape=(n_samples, n_features)
 			Data.
+
+		scale : tuple, shape=(2,)
+			Interval to scale data into.
 
 		Returns
 		-------
@@ -133,11 +136,8 @@ class Binary(Activation):
 	def gradient(self, X):
 		return np.zeros(X.shape)
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			return np.where(Y == 0, range[0], range[1])
-		return Y
+	def scale(self, Y, scale):
+		return np.where(Y == 0, scale[0], scale[1])
 
 class Sigmoid(Activation):
 	"""
@@ -154,12 +154,9 @@ class Sigmoid(Activation):
 		sig = self.activation(X)
 		return sig * (1 - sig)
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			size = range[1] - range[0]
-			return size * Y + range[0]
-		return Y
+	def scale(self, Y, scale):
+		size = scale[1] - scale[0]
+		return size * Y + scale[0]
 
 class Tanh(Activation):
 	"""
@@ -175,12 +172,9 @@ class Tanh(Activation):
 	def gradient(self, X):
 		return 1 - np.square(self.activation(X))
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			size = (range[1] - range[0]) / 2
-			return size * Y + range[0]
-		return Y
+	def scale(self, Y, scale):
+		size = (scale[1] - scale[0]) / 2
+		return size * Y + scale[0]
 
 class Arctan(Activation):
 	"""
@@ -196,12 +190,9 @@ class Arctan(Activation):
 	def gradient(self, X):
 		return 1 / (np.square(X) + 1)
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			size = (range[1] - range[0]) / np.pi
-			return size * Y + range[0]
-		return Y
+	def scale(self, Y, scale):
+		size = (scale[1] - scale[0]) / np.pi
+		return size * Y + scale[0]
 
 class ReLU(Activation):
 	"""
@@ -217,13 +208,10 @@ class ReLU(Activation):
 	def gradient(self, X):
 		return np.where(X > 0, 1, 0)
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			Y = Y + range[0]
-			Y = np.where(Y > range[1], range[1], Y)
-			return np.where(Y < range[0], range[0], Y)
-		return Y
+	def scale(self, Y, scale):
+		Y = Y + scale[0]
+		Y = np.where(Y > scale[1], scale[1], Y)
+		return np.where(Y < scale[0], scale[0], Y)
 
 class PReLU(ReLU):
 	"""
@@ -294,9 +282,6 @@ class Softmax(Activation):
 		s = self.activation(X, axis=axis)
 		return s * (1 - s)
 
-	def scale(self, Y, loss):
-		range = loss.scale
-		if range is not None:
-			size = range[1] - range[0]
-			return size * Y + range[0]
-		return Y
+	def scale(self, Y, scale):
+		size = scale[1] - scale[0]
+		return size * Y + scale[0]
