@@ -88,22 +88,6 @@ class Activation(Base, ABC):
 		"""
 		raise NotImplementedError("No gradient function implemented")
 
-	def classify(self, X, *args, **kwargs):
-		"""
-		Return classifications of `X` after activation.
-
-		Parameters
-		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data.
-
-		Returns
-		-------
-		C : array-like, shape=(n_samples, n_features)
-			Classifications based on `X`.
-		"""
-		return np.where(X > 0, 1, 0)
-
 	def scale(self, Y, loss, *args, **kwargs):
 		"""
 		Scale `Y` to the scale given by the LossFunction
@@ -149,9 +133,6 @@ class Binary(Activation):
 	def gradient(self, X):
 		return np.zeros(X.shape)
 
-	def classify(self, X):
-		return X
-
 	def scale(self, Y, loss):
 		range = loss.scale
 		if range is not None:
@@ -172,9 +153,6 @@ class Sigmoid(Activation):
 	def gradient(self, X):
 		sig = self.activation(X)
 		return sig * (1 - sig)
-
-	def classify(self, X):
-		return np.where(X < 0.5, 0, 1)
 
 	def scale(self, Y, loss):
 		range = loss.scale
@@ -197,10 +175,6 @@ class Tanh(Activation):
 	def gradient(self, X):
 		return 1 - np.square(self.activation(X))
 
-	def classify(self, X):
-		raise Warning("Tanh should not be used for classification")
-		return X
-
 	def scale(self, Y, loss):
 		range = loss.scale
 		if range is not None:
@@ -221,10 +195,6 @@ class Arctan(Activation):
 
 	def gradient(self, X):
 		return 1 / (np.square(X) + 1)
-
-	def classify(self, X):
-		raise Warning("Arctan should not be used for classification")
-		return X
 
 	def scale(self, Y, loss):
 		range = loss.scale
@@ -275,10 +245,6 @@ class PReLU(ReLU):
 	def gradient(self, X):
 		return np.where(X > 0, 1, self.a)
 
-	def classify(self, X):
-		raise Warning("PReLU should not be used for classification, using ReLU instead")
-		return np.where(X > 0, 1, 0)
-
 class ELU(ReLU):
 	"""
 	ELU Activation Function.
@@ -299,10 +265,6 @@ class ELU(ReLU):
 
 	def gradient(self, X):
 		return np.where(X > 0, 1, np.exp(X))
-
-	def classify(self, X):
-		raise Warning("LeakyReLU should not be used for classification, using ReLU instead")
-		return np.where(X > 0, 1, 0)
 
 class NoisyReLU(ReLU):
 	"""
@@ -331,9 +293,6 @@ class Softmax(Activation):
 	def gradient(self, X, axis=1):
 		s = self.activation(X, axis=axis)
 		return s * (1 - s)
-
-	def classify(self, X, axis=1):
-		return np.argmax(X, axis=axis)
 
 	def scale(self, Y, loss):
 		range = loss.scale
