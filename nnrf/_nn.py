@@ -120,7 +120,7 @@ class NeuralNetwork(BaseClassifier):
 			self.weights_ = [self.random_state.randn(self.n_features_, self.n_classes_) * 0.1]
 			self.bias_ = [self.random_state.randn(self.n_classes_) * 0.1]
 			self.n_layers_ = 1
-			self.layers = (self.n_features,)
+			self.layers = (self.n_features_,)
 			return
 		self.weights_.append(self.random_state.randn(self.n_features_, self.layers[0]) * 0.1)
 		self.bias_.append(self.random_state.randn(self.layers[0]))
