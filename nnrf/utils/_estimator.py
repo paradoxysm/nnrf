@@ -334,7 +334,7 @@ class BaseClassifier(BaseEstimator):
 			The order of classes is in sorted ascending order.
 		"""
 		if not self._is_fitted():
-			raise RunTimeError("Model is not fitted")
+			raise RuntimeError("Model is not fitted")
 		X = check_XY(X=X)
 		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
