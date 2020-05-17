@@ -45,8 +45,9 @@ def one_hot(Y, cols=None):
 	one_hot : ndarray, shape=(n_samples, n_cols)
 		One-hot encoded data.
 	"""
-	if Y.shape[1] == cols and set(Y) == set([0,1]):
-		return Y
+	if Y.shape[1] == cols and (set(Y.reshape(-1)) == set([0,1]) or \
+			set(Y.reshape(-1)) == set([0.,1.])):
+		return Y.astype(int)
 	if Y.size > len(Y) : raise ValueError("Matrix is not 1D")
 	Y_ = Y.reshape(-1)
 	if cols is None : cols = Y_.max() + 1
@@ -76,11 +77,13 @@ def decode(Y):
 	"""
 	if Y.shape[0] == Y.size:
 		return np.squeeze(Y)
-	elif set(Y) != set([0,1]):
+	elif set(Y.reshape(-1)) == set([0,1]) or \
+			set(Y.reshape(-1)) == set([0.,1.]):
+		return np.argmax(Y, axis=1)
+	else:
 		raise ValueError("Y must be one-hot encoded data with ints.")
-	return np.argmax(Y, axis=1)
 
-def calculate_batch(self, batch_size, length):
+def calculate_batch(batch_size, length):
 	"""
 	Calculate the batch size for the data of given length.
 
@@ -110,7 +113,7 @@ def calculate_batch(self, batch_size, length):
 		raise ValueError("Batch size must be None, an int less than %d," % length,
 							"or a float within (0,1]")
 
-def calculate_weight(self, Y, n_classes, class_weight=None, weights=None):
+def calculate_weight(Y, n_classes, class_weight=None, weights=None):
 	"""
 	Calculate the weights applied to the predicted labels,
 	combining class weights and sample weights.
@@ -151,7 +154,7 @@ def calculate_weight(self, Y, n_classes, class_weight=None, weights=None):
 	else : raise ValueError("Class Weight must either be a dict or 'balanced' or None")
 	return weights * class_weights
 
-def calculate_bootstrap(self, bootstrap_size, length):
+def calculate_bootstrap(bootstrap_size, length):
 	"""
 	Calculate the bootstrap size for the data of given length.
 
