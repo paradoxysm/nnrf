@@ -139,7 +139,7 @@ class NNDT(BaseClassifier):
 		self.weights_ = self.random_state.randn(n, s, 2) * 0.1
 		self.bias_ = self.random_state.randn(n, 1, 2) * 0.1
 		for i in range(n):
-			input = self.random_state.choice(self.n_features, size=(1, self.r), replace=False)
+			input = self.random_state.choice(self.n_features_, size=(1, self.r), replace=False)
 			self.inputs_ = np.concatenate((self.inputs_, input))
 		self.sweights_ = self.random_state.randn(2**self.d, self.n_classes_) * 0.1
 		self.sbias_ = self.random_state.randn(self.n_classes_) * 0.1
