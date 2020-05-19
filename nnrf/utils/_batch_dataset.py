@@ -16,6 +16,9 @@ class BatchDataset:
 	Y : array-like, shape=(n_samples, n_labels), default=None
 		Labels.
 
+	weights : array-like, shape=(n_samples,), default=None
+		Sample weights. If None, then samples are equally weighted.
+
 	seed : None or int or RandomState, default=None
 		Initial seed for the RandomState. If seed is None,
 		return the RandomState singleton. If seed is an int,
@@ -37,9 +40,11 @@ class BatchDataset:
 	i : int
 		Number of times data has been drawn from the BatchDataset.
 	"""
-	def __init__(self, X, Y=None, seed=None):
+	def __init__(self, X, Y=None, weights=None, seed=None):
 		self.X = np.array(X)
 		self.Y = np.array(Y) if Y is not None else None
+		if weights is not None : self.weights = np.array(weights)
+		else : self.weights = np.ones(len(X))
 		self.seed = create_random_state(seed=seed)
 		self.available = np.arange(len(self.X)).astype(int)
 		self.batch_size = 1
@@ -92,9 +97,9 @@ class BatchDataset:
 		Returns
 		-------
 		next : ndarray or tuple of ndarray
-			The batched data, and if available, labels.
+			The batched data, and if available, labels and weights.
 		"""
-		if self.i == 0 : self._organize()
+		if self.i == 0 : self.organize()
 		if len(self.available) < self.batch_size:
 			batch = self.available
 			self.available = np.array([])
@@ -102,12 +107,13 @@ class BatchDataset:
 			batch = self.available[:self.batch_size]
 			self.available = self.available[self.batch_size:]
 		if len(self.available) < self.batch_size:
-			self._organize(prepend=self.available)
+			self.organize(prepend=self.available)
 		self.i += 1
-		if self.Y is None:
-			return self.X[batch]
-		else:
-			return self.X[batch], self.Y[batch]
+		next = [self.X[batch]]
+		if self.Y is None : next.append(None)
+		else : next.append(self.Y[batch])
+		next.append(self.weights[batch])
+		return next
 
 	def _calculate_n_batches(self):
 		"""
@@ -121,7 +127,7 @@ class BatchDataset:
 		"""
 		return len(self.X) // self.batch_size + 1
 
-	def _organize(self, prepend=[], append=[]):
+	def organize(self, prepend=[], append=[]):
 		"""
 		Organize the BatchDataset according to `order`.
 		In this manner, the order of shuffle, repeat, and
