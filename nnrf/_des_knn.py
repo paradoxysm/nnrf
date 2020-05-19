@@ -74,7 +74,6 @@ class DESKNN(BaseEstimator):
 	def __init__(self, ensemble, k=100, leaf_size=40,
 					selection=None, rank=True, verbose=0, warm_start=False,
 					metric='accuracy'):
-		if metric is None : metric = 'accuracy'
 		super().__init__(verbose=verbose, warm_start=warm_start,
 							metric=metric)
 		self.ensemble = ensemble
@@ -85,7 +84,7 @@ class DESKNN(BaseEstimator):
 		self.data_ = np.array([])
 		self.scores_ = np.array([])
 
-	def fit(X, Y, weights=None):
+	def fit(self, X, Y, weights=None):
 		"""
 		Train the model on the given data and labels.
 
@@ -128,7 +127,7 @@ class DESKNN(BaseEstimator):
 		if verbose > 0 : print("Training complete.")
 		return self
 
-	def predict_proba(X):
+	def predict_proba(self, X):
 		"""
 		Predict class probabilities for each sample in `X`.
 
