@@ -168,10 +168,12 @@ class CrossEntropy(LossFunction):
 		self.name = 'cross-entropy'
 
 	def loss(self, Y_hat, Y, axis=1):
-		return np.where(Y == 1, -1 * np.log(Y_hat), -1 * np.log(1 - Y_hat))
+		return np.where(Y == 1, -1 * np.log(Y_hat + 1e-8),
+							-1 * np.log(1 - Y_hat + 1e-8))
 
 	def gradient(self, Y_hat, Y, axis=1):
-		return - (np.divide(Y, Y_hat) - np.divide(1 - Y, 1 - Y_hat))
+		return - (np.divide(Y, Y_hat + 1e-8) - \
+					np.divide(1 - Y, (1 - Y_hat) + 1e-8))
 
 class Hinge(LossFunction):
 	"""
