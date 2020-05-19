@@ -1,13 +1,11 @@
 import numpy as np
 from tqdm import trange
 
-from nnrf import NNDT, NeuralNetwork
-from nnrf.ml import get_loss, get_activation, get_regularizer
+from nnrf import NNDT
+from nnrf.ml import get_activation, get_regularizer, get_optimizer
 from nnrf.ml.activation import PReLU
-from nnrf.utils import check_XY, one_hot, calculate_batch, \
-						calculate_bootstrap, \
-						create_random_state, BatchDataset
-from nnrf.analysis import get_metrics
+from nnrf.utils import check_XY, one_hot, decode, calculate_batch, \
+						calculate_bootstrap, BatchDataset
 
 from nnrf.utils._estimator import BaseClassifier
 
@@ -48,8 +46,10 @@ class NNRF(BaseClassifier):
 		Must be one of the default regularizers or an object that
 		extends Regularizer. If None, no regularization is done.
 
-	alpha : float, default=0.001
-		Learning rate. NNDT uses gradient descent.
+	optimizer : str, Optimizer, default='adam'
+		Optimization method. Must be one of
+		the default optimizers or an object that
+		extends Optimizer.
 
 	max_iter : int, default=10
 		Maximum number of epochs to conduct during training.
@@ -108,7 +108,7 @@ class NNRF(BaseClassifier):
 		True if the model has been deemed trained and
 		ready to predict new data.
 	"""
-	def __init__(self, n=50, d=5, r='sqrt', alpha=0.001, loss='cross-entropy',
+	def __init__(self, n=50, d=5, r='sqrt', optimizer='adam', loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, max_iter=10, tol=1e-4,
 					bootstrap_size=None, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
@@ -120,9 +120,9 @@ class NNRF(BaseClassifier):
 		self.n = n
 		self.d = d
 		self.r = r
-		self.alpha = alpha
-		self.activation = get_activation(activation)
-		self.regularizer = get_regularizer(regularize)
+		self.activation = activation
+		self.regularizer = regularize
+		self.optimizer = optimizer
 		self.max_iter = max_iter
 		self.tol = tol
 		self.bootstrap_size = bootstrap_size
@@ -136,7 +136,7 @@ class NNRF(BaseClassifier):
 		for n in range(self.n):
 			if self.verbose == 0 : verbose = 0
 			else : verbose = self.verbose - 1
-			nndt = NNDT(d=self.d, r=self.r, alpha=self.alpha, loss=self.loss,
+			nndt = NNDT(d=self.d, r=self.r, optimizer=self.optimizer, loss=self.loss,
 							activation=self.activation,regularize=self.regularizer,
 							max_iter=self.max_iter, tol=self.tol,
 							batch_size=self.batch_size,
@@ -146,7 +146,7 @@ class NNRF(BaseClassifier):
 							random_state=random_state[n])
 			nndt.n_classes_ = self.n_classes_
 			nndt.n_features_ = self.n_features_
-			self.estimators.append(nndt)
+			self.estimators_.append(nndt)
 
 	def decision_path(self, X, full=False):
 		"""
@@ -203,33 +203,31 @@ class NNRF(BaseClassifier):
 			Fitted estimator.
 		"""
 		X, Y = check_XY(X=X, Y=Y)
-		self.n_classes_ = len(set(Y))
-		self.n_features_ = X.shape[1]
+		if self.n_classes_ is None : self.n_classes_ = len(set(decode(Y)))
+		if self.n_features_ is None : self.n_features_ = X.shape[1]
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
 		bootstrap = calculate_bootstrap(self.bootstrap_size, len(X))
+		print(bootstrap)
 		batch_size = calculate_batch(self.batch_size, len(Y))
+		ds = BatchDataset(X, Y, weights, seed=self.random_state).shuffle().repeat().batch(bootstrap)
 		if not self.warm_start or not self._is_fitted():
-			if verbose > 0 : print("Initializing model")
+			if self.verbose > 0 : print("Initializing model")
 			self._initialize()
-		if verbose > 0 : print("Training model for %d epochs" % self.max_iter,
+		if self.verbose > 0 : print("Training model for %d epochs" % self.max_iter,
 								"on %d samples in batches of %d." % \
-								(X.shape[0], self.batch_size),
-								"Convergence tolerance set to %.4f." % self.tol)
-		if verbose > 0 : print("Training model with %d estimators." % self.n)
-		estimators = range(len(self.estimators_))
-		if verbose == 1 : estimators = trange(len(self.estimators_))
+								(X.shape[0], batch_size))
+		if self.verbose > 0 : print("Training model with %d estimators." % self.n)
+		if self.verbose == 1 : estimators = trange(len(self.estimators_))
+		else : estimators = range(len(self.estimators_))
 		for e in estimators:
-			if verbose == 1 : estimators.set_description("Estimator %d" % e+1)
-			elif verbose > 1 : print("Fitting estimator %d" % e+1)
-			data = np.concatenate((X, Y, weights.reshape(-1,1)), axis=1)
-			data = self.random_state.permutation(data)
-			X_ = data[:bootstrap, :X.shape[1]]
-			Y_ = data[:bootstrap, X.shape[1]:-1]
-			weights = data[:bootstrap, -1]
-			e.fit(X_, Y_, weights=weights)
+			if self.verbose == 1 : estimators.set_description("Estimator %d" % (e+1))
+			elif self.verbose > 1 : print("Fitting estimator %d" % e+1)
+			X_, Y_, weights_ = ds.next()
+			ds.i = 0
+			self.estimators_[e].fit(X_, Y_, weights=weights_)
 		self.fitted_ = True
-		if verbose > 0 : print("Training complete.")
+		if self.verbose > 0 : print("Training complete.")
 		return self
 
 	def set_warm_start(self, warm):
