@@ -100,8 +100,8 @@ def calculate_batch(batch_size, length):
 
 	Returns
 	-------
-	batch_size : int
-		Batch size.
+	batch : int
+		Actual batch size.
 	"""
 	if batch_size is None : return length
 	elif isinstance(batch_size, int) and batch_size > 0 and \
@@ -171,13 +171,13 @@ def calculate_bootstrap(bootstrap_size, length):
 
 	Returns
 	-------
-	bootstrap_size : int
-		Bootstrap size.
+	bootstrap : int
+		Actual bootstrap size.
 	"""
 	if bootstrap_size is None:
-		bootstrap = length
-	elif isinstance(bootstrap_size, int) and bootstrap > 0:
-		bootstrap = bootstrap_size
+		return length
+	elif isinstance(bootstrap_size, int) and bootstrap_size > 0:
+		return bootstrap_size
 	elif isinstance(bootstrap_size, float) and 0 < bootstrap_size <= 1:
-		bootstrap = int(bootstrap_size * length)
+		return int(bootstrap_size * length)
 	else : raise ValueError("Bootstrap Size must be None, a positive int or float in (0,1]")
