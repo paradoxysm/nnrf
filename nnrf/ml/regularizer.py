@@ -95,7 +95,7 @@ class L1(Regularizer):
 		return self.c * np.linalg.norm(w, 1, axis=axis)
 
 	def gradient(self, w, axis=1):
-		return self.c * w
+		return self.c
 
 class L2(Regularizer):
 	"""
