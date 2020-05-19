@@ -208,7 +208,6 @@ class NNRF(BaseClassifier):
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
 		bootstrap = calculate_bootstrap(self.bootstrap_size, len(X))
-		print(bootstrap)
 		batch_size = calculate_batch(self.batch_size, len(Y))
 		ds = BatchDataset(X, Y, weights, seed=self.random_state).shuffle().repeat().batch(bootstrap)
 		if not self.warm_start or not self._is_fitted():
