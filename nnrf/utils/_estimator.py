@@ -286,14 +286,13 @@ class BaseClassifier(BaseEstimator):
 			self._initialize()
 		if self.verbose > 0 : print("Training model for %d epochs" % self.max_iter,
 								"on %d samples in batches of %d." % \
-								(X.shape[0], batch_size),
-								"Convergence tolerance set to %f." % self.tol)
+								(X.shape[0], batch_size))
 		loss_prev, early_stop, e = np.inf, False, 0
 		epochs = range(self.max_iter)
 		if self.verbose == 1 : epochs = trange(self.max_iter)
 		for e in epochs:
 			batches = range(ds.n_batches)
-			if self.verbose == 2 : batches = trange(batches)
+			if self.verbose == 2 : batches = trange(ds.n_batches)
 			if self.verbose > 2 : print("Epoch %d" % e)
 			for b in batches:
 				X_batch, Y_batch = ds.next()
