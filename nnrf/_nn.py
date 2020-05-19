@@ -95,7 +95,7 @@ class NeuralNetwork(BaseClassifier):
 		Biases of the model.
 	"""
 	def __init__(self, layers=(100,), activation='relu', loss='cross-entropy',
-					optimizer='adam', batch_size=None, max_iter=10, tol=1e-4,
+					optimizer='adam', batch_size=None, max_iter=100, tol=1e-4,
 					random_state=None, regularize=None, class_weight=None,
 					metric='accuracy', verbose=0, warm_start=False):
 		super().__init__(loss=loss, max_iter=max_iter, tol=tol,

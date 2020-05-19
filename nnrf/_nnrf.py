@@ -109,7 +109,7 @@ class NNRF(BaseClassifier):
 		ready to predict new data.
 	"""
 	def __init__(self, n=50, d=5, r='sqrt', optimizer='adam', loss='cross-entropy',
-					activation=PReLU(0.2), regularize=None, max_iter=10, tol=1e-4,
+					activation=PReLU(0.2), regularize=None, max_iter=100, tol=1e-4,
 					bootstrap_size=None, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):

@@ -114,7 +114,7 @@ class NNDT(BaseClassifier):
 	"""
 	def __init__(self, d=5, r='sqrt', loss='cross-entropy',
 					activation=PReLU(0.2), regularize=None, optimizer='adam',
-					max_iter=10, tol=1e-4, batch_size=None, class_weight=None,
+					max_iter=100, tol=1e-4, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
 		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
