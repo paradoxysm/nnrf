@@ -280,7 +280,7 @@ class BaseClassifier(BaseEstimator):
 		try : Y = one_hot(Y, cols=self.n_classes_)
 		except : raise
 		batch_size = calculate_batch(self.batch_size, len(Y))
-		ds = BatchDataset(X, Y, seed=self.random_state).shuffle().repeat().batch(batch_size)
+		ds = BatchDataset(X, Y, weights, seed=self.random_state).shuffle().repeat().batch(batch_size)
 		if not self.warm_start or not self._is_fitted():
 			if self.verbose > 0 : print("Initializing model")
 			self._initialize()
@@ -295,7 +295,7 @@ class BaseClassifier(BaseEstimator):
 			if self.verbose == 2 : batches = trange(ds.n_batches)
 			elif self.verbose > 2 : print("Epoch %d" % e)
 			for b in batches:
-				X_batch, Y_batch = ds.next()
+				X_batch, Y_batch, weights = ds.next()
 				if len(X_batch) == 0:
 					if self.verbose > 0 : print("No more data to train. Ending training.")
 					early_stop = True
@@ -306,7 +306,7 @@ class BaseClassifier(BaseEstimator):
 				msg = 'loss: %.4f' % loss + ', ' + self.metric.name + ': %.4f' % metric
 				if self.verbose == 1 : epochs.set_description(msg)
 				elif self.verbose == 2 : batches.set_description(msg)
-				elif self.verbose > 2 : print("Epoch %d, Batch %d completed." % (e, b), msg)
+				elif self.verbose > 2 : print("Epoch %d, Batch %d completed." % (e+1, b+1), msg)
 				if self.tol is not None and np.abs(loss - loss_prev) < self.tol:
 					early_stop = True
 					break
