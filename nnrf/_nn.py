@@ -1,6 +1,6 @@
 import numpy as np
 
-from nnrf.ml import get_loss, get_activation, get_regularizer
+from nnrf.ml import get_activation, get_regularizer, get_optimizer
 from nnrf.utils import check_XY, one_hot, decode, calculate_weight, \
 						create_random_state, BatchDataset
 from nnrf.analysis import get_metrics
@@ -27,8 +27,10 @@ class NeuralNetwork(BaseClassifier):
 		one of the default loss functions or an object
 		that extends LossFunction.
 
-	alpha : float, default=0.001
-		Learning rate. model uses gradient descent.
+	optimizer : str, Optimizer, default='adam'
+		Optimization method. Must be one of
+		the default optimizers or an object that
+		extends Optimizer.
 
 	batch_size : int, float, default=None
 		Batch size for training. Must be one of:
@@ -93,7 +95,7 @@ class NeuralNetwork(BaseClassifier):
 		Biases of the model.
 	"""
 	def __init__(self, layers=(100,), activation='relu', loss='cross-entropy',
-					alpha=0.001, batch_size=None, max_iter=10, tol=1e-4,
+					optimizer='adam', batch_size=None, max_iter=10, tol=1e-4,
 					random_state=None, regularize=None, class_weight=None,
 					metric='accuracy', verbose=0, warm_start=False):
 		super().__init__(loss=loss, max_iter=max_iter, tol=tol,
@@ -103,8 +105,7 @@ class NeuralNetwork(BaseClassifier):
 		self.activation = get_activation(activation)
 		self.softmax = get_activation('softmax')
 		self.regularizer = get_regularizer(regularize)
-		self.loss = get_loss(loss)
-		self.alpha = alpha
+		self.optimizer = get_optimizer(optimizer)
 		self.layers = layers
 		self.n_layers_ = len(self.layers)
 		self.weights_ = []
@@ -130,6 +131,10 @@ class NeuralNetwork(BaseClassifier):
 		self.weights_.append(self.random_state.randn(self.layers[-1], self.n_classes_) * 0.1)
 		self.bias_.append(self.random_state.randn(self.n_classes_) * 0.1)
 		self.n_layers_ += 1
+		keys = []
+		for l in range(self.n_layers_):
+			keys += ['w' + str(l), 'b' + str(l)]
+		self.optimizer.setup(keys)
 
 	def _is_fitted(self):
 		"""
@@ -161,14 +166,13 @@ class NeuralNetwork(BaseClassifier):
 			Output.
 		"""
 		self._x, self._z = [], []
-		X_ = X
 		for l in range(self.n_layers_):
-			Z = np.dot(X_, self.weights_[l]) + self.bias_[l]
+			Z = np.dot(X, self.weights_[l]) + self.bias_[l]
 			if l < self.n_layers_ - 1 : A = self.activation.activation(Z)
 			else : A = self.softmax.activation(Z)
 			self._z.append(Z)
-			self._x.append(X_)
-			X_ = A
+			self._x.append(X)
+			X = A
 		return A
 
 	def _backward(self, Y_hat, Y, weights=None):
@@ -191,14 +195,15 @@ class NeuralNetwork(BaseClassifier):
 					class_weight=self.class_weight, weights=weights)
 		m = len(Y)
 		dY = self.loss.gradient(Y_hat, Y) * weights.reshape(-1,1)
+		dY_ = dY
 		for l in range(self.n_layers_ - 1, -1, -1):
 			if l == self.n_layers_ - 1:
 				dZ = dY * self.softmax.gradient(self._z[-1])
 			else : dZ = dY * self.activation.gradient(self._z[l])
 			dW = np.dot(self._x[l].T, dZ) / m
 			db = np.sum(dZ, axis=0) / m
-			if self.regularizer is not None:
-				self.weights_[l] -= self.regularizer.gradient(self.weights_[l])
-			self.weights_[l] -= self.alpha * dW
-			self.bias_[l] -= self.alpha * db
 			dY = np.dot(dZ, self.weights_[l].T)
+			if self.regularizer is not None:
+				dW += self.regularizer.gradient(self.weights_[l])
+			self.weights_[l] -= self.optimizer.update('w' + str(l), dW)
+			self.bias_[l] -= self.optimizer.update('b' + str(l), db)
