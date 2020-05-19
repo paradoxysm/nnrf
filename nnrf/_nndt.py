@@ -1,6 +1,6 @@
 import numpy as np
 
-from nnrf.ml import get_activation, get_regularizer
+from nnrf.ml import get_activation, get_regularizer, get_optimizer
 from nnrf.ml.activation import PReLU
 from nnrf.utils import check_XY, one_hot, decode, calculate_weight, \
 						create_random_state, BatchDataset
@@ -36,6 +36,11 @@ class NNDT(BaseClassifier):
 		Activation function to use at each node in the NNDT.
 		Must be one of the default loss functions or an
 		object that extends Activation.
+
+	optimizer : str, Optimizer, default='adam'
+		Optimization method. Must be one of
+		the default optimizers or an object that
+		extends Optimizer.
 
 	regularize : str, Regularizer, None, default=None
 		Regularization function to use at each node in the NNDT.
@@ -108,7 +113,7 @@ class NNDT(BaseClassifier):
 		Biases of the softmax aggregator layer.
 	"""
 	def __init__(self, d=5, r='sqrt', loss='cross-entropy',
-					activation=PReLU(0.2), regularize=None, alpha=0.001,
+					activation=PReLU(0.2), regularize=None, optimizer='adam',
 					max_iter=10, tol=1e-4, batch_size=None, class_weight=None,
 					verbose=0, warm_start=False, metric='accuracy',
 					random_state=None):
@@ -121,7 +126,7 @@ class NNDT(BaseClassifier):
 		self.activation = get_activation(activation)
 		self.softmax = get_activation('softmax')
 		self.regularizer = get_regularizer(regularize)
-		self.alpha = alpha
+		self.optimizer = get_optimizer(optimizer)
 		self.weights_ = np.array([])
 		self.bias_ = np.array([])
 		self.inputs_ = np.array([])
@@ -138,11 +143,16 @@ class NNDT(BaseClassifier):
 		n, s = 2**self.d - 1, self.r + 1
 		self.weights_ = self.random_state.randn(n, s, 2) * 0.1
 		self.bias_ = self.random_state.randn(n, 1, 2) * 0.1
+		self.inputs_ = self.inputs_.reshape(-1, self.r).astype(int)
 		for i in range(n):
 			input = self.random_state.choice(self.n_features_, size=(1, self.r), replace=False)
 			self.inputs_ = np.concatenate((self.inputs_, input))
 		self.sweights_ = self.random_state.randn(2**self.d, self.n_classes_) * 0.1
 		self.sbias_ = self.random_state.randn(self.n_classes_) * 0.1
+		keys = ['sw', 'sb']
+		for i in range(n):
+			keys += ['w' + str(i), 'b' + str(i)]
+		self.optimizer.setup(keys)
 
 	def decision_path(self, X):
 		"""
@@ -198,28 +208,28 @@ class NNDT(BaseClassifier):
 			Softmax output.
 		"""
 		s = np.zeros(len(X))
-		X_ = np.concatenate((self._get_inputs(0, X), np.zeros(len(X))), axis=1)
-		self._x, self._z, self._s, self._p = [], [], [], []
+		p = s.reshape(-1,1)
+		self._x, self._z, self._s, self._p = [], [], [s], [p]
 		for d in range(self.d):
-			n = 2**d + s - 1
+			n = (2**d + s - 1).astype(int)
 			weights = self._get_weights(n)
-			bias = self._get_bias(n)
-			X_d = self._get_inputs(n, X_)
+			bias = self._get_bias(n).reshape(-1,2)
+			X_d = self._get_inputs(n, X)
+			X_d = np.concatenate((X_d, p), axis=1)
 			z = np.einsum('ijk,ij->ik', weights, X_d) + bias
 			a = self.activation.activation(z)
-			k = np.argmax(a, axis=0)
-			s = 2 * s + k
+			k = np.argmax(a, axis=1).astype(int)
+			s = (2 * s + k).astype(int)
 			i = (np.arange(len(X)), k)
 			p = a[i].reshape(-1,1)
-			X_ = np.concatenate((X, p), axis=1)
 			self._x.append(X_d)
 			self._z.append(z)
 			self._s.append(s)
 			self._p.append(p)
 		p = np.zeros((len(X), 2**self.d))	# N(2**d)
-		s = 2 * self._s[-2]
-		s = np.concatenate((s, s+1))
-		i = (np.repeat(np.arange(len(X)),2), s)
+		s = (2 * self._s[-2]).reshape(-1,1)
+		s = np.concatenate((s, s+1), axis=1).astype(int)
+		i = (np.arange(len(X)).reshape(-1,1), s)
 		p[i] += a
 		z = np.dot(p, self.sweights_) + self.sbias_ # NC
 		Y_hat = self.softmax.activation(z)
@@ -248,33 +258,44 @@ class NNDT(BaseClassifier):
 		dsZ = dY * self.softmax.gradient(self._z[-1]) # NC
 		dsW = np.dot(self._p[-1].T, dsZ) / len(Y_hat) # (2**d)C
 		dsb = np.sum(dsZ, axis=0) / len(Y_hat) # C
-		dp_ = np.dot(dsZ, self.sweights_.T) # N(2**d)
-		s = 2 * self._s[-2]
-		s = np.concatenate((s, s+1))
-		i = (np.repeat(np.arange(len(X)),2), s)
-		dp = dp_[i].reshape(-1,2) # N2
+		s = (2 * self._s[-2]).reshape(-1,1) # N1
+		s = np.concatenate((s, s+1), axis=1).astype(int).flatten() # (2N)
+		weights = self.sweights_[s].reshape(-1,2,self.sweights_.shape[-1]) # N2C
+		dp = np.einsum('ik,ijk->ij', dsZ, weights) # NC * N2C -> N2
 		if self.regularizer is not None:
-			self.sweights_ -= self.regularizer.gradient(self.sweights_)
-			for n in range(len(self.weights_)):
-				self.weights_[n] -= self.regularizer.gradient(self.weights_[n])
-		self.sweights_ -= self.alpha * dsW
-		self.sbias_ -= self.alpha * dsb
+			dsW += self.regularizer.gradient(self.sweights_)
+		self.sweights_ -= self.optimizer.update('sw', dsW)
+		self.sbias_ -= self.optimizer.update('sb', dsb)
 		for i in range(self.d):
-			z = self._z[-2-i]
+			z = self._z[-2-i] # N2
 			if i > 0:
 				idx = tuple([np.arange(len(z)), self._s[-1-i] % 2])
 				dZ_ = np.sum(dp, axis=1) * self.activation.gradient(z[idx]) # N1 * N1 -> N1
-				dZ = np.zeros(z.shape)
+				dZ = np.zeros(z.shape) # N2
 				dZ[idx] += dZ_.reshape(-1) # N2
 			else:
 				dZ = dp * self.activation.gradient(z) # N2 * N2 -> N2
-			dW = np.einsum('ij,ik->ijk', self._x[-1-i], dZ) # NM * N2 -> NM2
-			db = dZ # N2
-			n = 2**d + self._s[-2-i] - 1
-			dp = np.einsum('ijk,ik->ik', self._get_weights(n), dZ) # NM2 * N2 -> N2
-			n_count =  np.bincount(n.reshape(-1))
-			self.weights_[n] -= self.alpha * dW / n_count[n]
-			self.bias_[n] -= self.alpha * db / n_count[n]
+			dW_ = np.einsum('ij,ik->ijk', self._x[-1-i], dZ) # NM * N2 -> NM2
+			db_ = dZ.reshape(-1,1,2) # N12
+			nodes = self._s[-2-i].astype(int)
+			n = (2**(self.d - i - 1) + nodes - 1).astype(int)
+			weights = self._get_weights(n)[:,-1,:].reshape(-1,1,2) # N12
+			dp = np.einsum('ik,ijk->ij', dZ, weights).reshape(-1,1) # N2 * N12 -> N1
+			n_count =  np.bincount(nodes.reshape(-1))
+			layer_size = 2**(self.d - i - 1)
+			dW = np.zeros((layer_size, self.r + 1, 2))
+			db = np.zeros((layer_size, 1, 2))
+			if self.regularizer is not None:
+				reg = self.regularizer.gradient(self.weights_)[n] # NM2
+				reg = np.einsum('ijk,i->ijk', reg, 1 / n_count[nodes])
+				np.add.at(dW, nodes, reg)
+			np.add.at(dW, nodes, np.einsum('ijk,i->ijk', dW_, 1 / n_count[nodes]))
+			np.add.at(db, nodes, np.einsum('ijk,i->ijk', db_, 1 / n_count[nodes]))
+			for l in range(layer_size):
+				node = int(2**(self.d - i - 1) + l - 1)
+				l_key = str(node)
+				self.weights_[node] -= self.optimizer.update('w' + l_key, dW[l])
+				self.bias_[node] -= self.optimizer.update('b' + l_key, db[l])
 
 	def _get_weights(self, node):
 		"""
@@ -325,7 +346,8 @@ class NNDT(BaseClassifier):
 		inputs : array-like, shape=(n_samples, r)
 			List of inputs for each data sample.
 		"""
-		return X[i, self.inputs_[node]]
+		indices = (np.arange(len(X)).reshape(-1,1), self.inputs_[node])
+		return X[indices]
 
 	def _calculate_r(self):
 		"""
@@ -340,3 +362,4 @@ class NNDT(BaseClassifier):
 		elif isinstance(self.r, float) and 0 < self.r <= 1 : self.r = int(self.r * self.n_features_)
 		elif not (isinstance(self.r, int) and self.r > 0):
 			raise ValueError("R must be None, a positive int or float in (0,1]")
+		if self.r == 0 : self.r = 1
