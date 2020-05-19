@@ -67,6 +67,9 @@ class DESKNN(BaseEstimator):
 	data_ : ndarray, shape=(n_samples, n_features)
 		Training data.
 
+	targets_ : ndarray, shape(n_samples,)
+		Labels for training data.
+
 	scores_ : ndarray, shape=(n_samples, n_estimators)
 		Accuracy scores for each estimator in the ensemble.
 		1 if the estimator was correct, 0 otherwise.
@@ -82,6 +85,7 @@ class DESKNN(BaseEstimator):
 		self.rank = rank
 		self.knn = NearestNeighbors(n_neighbors=k, leaf_size=leaf_size)
 		self.data_ = np.array([])
+		self.targets_ = np.array([])
 		self.scores_ = np.array([])
 
 	def fit(self, X, Y, weights=None):
@@ -113,18 +117,19 @@ class DESKNN(BaseEstimator):
 								self.ensemble.n_features_,
 								"but encountered data with %d features." % \
 								X.shape[1])
-		if verbose > 0 : print("Initializing and training model")
+		if self.verbose > 0 : print("Initializing and training model")
 		if self.n_classes_ is None : self.n_classes_ = self.ensemble.n_classes_
 		if self.n_features_ is None : self.n_features_ = self.ensemble.n_features_
-		self.data_ = X
-		if verbose > 2 : print("Fitting Nearest Neighbors")
+		self.data_, self.targets_ = X, Y.reshape(-1)
+		if self.verbose > 2 : print("Fitting Nearest Neighbors")
 		self.knn.fit(X)
-		if verbose > 2 : print("Scoring ensemble")
+		if self.verbose > 2 : print("Scoring ensemble")
 		for e in self.ensemble.estimators_:
-			p = np.where(e.predict(X) == Y, 1, 0)
-			self.scores_ = np.concatenate((self.scores_, p.reshape(-1,1)), axis=1)
+			p = np.where(e.predict(X) == Y.reshape(-1), 1, 0)
+			self.scores_ = np.concatenate((self.scores_, p))
+		self.scores_ = self.scores_.reshape(-1, len(X)).T
 		self.fitted_ = True
-		if verbose > 0 : print("Training complete.")
+		if self.verbose > 0 : print("Training complete.")
 		return self
 
 	def predict_proba(self, X):
@@ -145,17 +150,20 @@ class DESKNN(BaseEstimator):
 		if not self._is_fitted():
 			raise RunTimeError("Model is not fitted")
 		X = check_XY(X=X)
-		if verbose > 0 : print("Predicting %d samples." % \
+		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
 		d, i = self.knn.kneighbors(X)
-		competence = self._calculate_competence(self.data_[i])
-		estimators = self._select(competence)
+		competence = self._calculate_competence(i) #NE
+		i_estimators = self._select(competence) # Ne
+		estimators = self.ensemble.estimators_
 		n_estimators = len(estimators)
-		pred = np.zeros((n_estimators, self.n_classes_), dtype=int)
-		for e in range(n_estimators):
-			p = one_hot(estimators[e].predict(X))
-			if self.rank : p *= competence[e]
-			pred += p
+		pred = np.zeros((len(X), self.n_classes_))
+		for n in range(len(X)):
+			for e in range(n_estimators):
+				estimator = estimators[i_estimators[n, e]]
+				p = estimator.predict_proba(X[n].reshape(1,-1)) # NC
+				if self.rank : p *= competence[n, i_estimators[n, e]]
+				pred[n] += p.reshape(-1)
 		return pred / n_estimators
 
 	def _is_fitted(self):
@@ -169,34 +177,38 @@ class DESKNN(BaseEstimator):
 			True if the model can be used to predict data.
 		"""
 		data = len(self.data_) > 0
+		targets = len(self.targets_) > 0
 		score = len(self.scores_) > 0
 		ensemble = self.ensemble._is_fitted()
-		return data and score and ensemble and self.fitted_
+		return data and targets and score and ensemble and self.fitted_
 
-	def _calculate_competence(self, X):
+	def _calculate_competence(self, i):
 		"""
 		Calculate competence scores of estimators
 		in the ensemble based on the metric.
 
 		Parameters
 		----------
-		X : array-like, shape=(n_samples, n_features)
-			Data to calculate competence.
+		i : array-like, shape=(n_samples, n_neighbors)
+			Indices of data to calculate competence
+			for each data sample.
 
 		Returns
 		-------
-		competence : ndarray, shape=(n_estimators,)
+		competence : ndarray, shape=(n_sample, n_estimators)
 			Scores of each estimator for the given data.
 		"""
 		if self.metric.name == 'accuracy':
-			s = self.scores_[i]
-			return np.mean(s, axis=0)
+			s = self.scores_[i] #NIE
+			return np.mean(s, axis=1) # NE
 		competence = []
+		X, Y = self.data_[i], self.targets_[i] # NIF, NI
 		for e in self.ensemble.estimators_:
-			Y_hat = e.predict(X)
-			c = self.metric.score(Y_hat, Y)
-			competence = np.concatenate((competence, c))
-		return competence
+			Y_hat = e.predict(X.reshape(-1, X.shape[-1]))
+			Y_hat = Y_hat.reshape(X.shape[0],-1) # NI
+			c = [self.metric.score(Y_hat[k], Y[k]) for k in len(Y)] # N
+			competence.append(c)
+		return np.array(competence).T
 
 	def _select(self, competence):
 		"""
@@ -204,19 +216,19 @@ class DESKNN(BaseEstimator):
 
 		Parameters
 		----------
-		competence : ndarray, shape=(n_estimators,)
+		competence : ndarray, shape=(n_samples, n_estimators)
 			Scores of each estimator for the given data.
 
 		Returns
 		-------
-		estimators : ndarray, shape=(n_selected,)
+		estimators : ndarray, shape=(n_samples, n_selected)
 			Indices of selected estimators.
 		"""
 		n = len(self.ensemble.estimators_)
 		if self.selection is None:
-			return self.ensemble.estimators_
+			return np.array([np.arange(n) for i in range(len(competence))])
 		elif isinstance(self.selection, int) and 0 < self.selection <= n:
-			return np.argpartition(competence, - self.selection)[- self.selection:]
+			return np.argpartition(competence, - self.selection)[:, - self.selection:]
 		elif isinstance(self.selection, float) and 0 < self.selection <= 1:
 			selection = int(self.selection * n)
-			return np.argpartition(competence, - selection)[- selection:]
+			return np.argpartition(competence, - selection)[:, - selection:]
