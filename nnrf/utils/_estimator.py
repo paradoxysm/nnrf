@@ -42,6 +42,7 @@ class BaseEstimator(Base, ABC):
 	def __init__(self, verbose=0, warm_start=False, metric='accuracy'):
 		self.verbose = verbose
 		self.warm_start = warm_start
+		if metric is None : metric = 'accuracy'
 		self.metric = get_metrics(metric)
 		self.fitted_ = False
 		self.n_classes_ = None
