@@ -4,7 +4,7 @@
 [![Codecov](https://flat.badgen.net/codecov/c/github/paradoxysm/nnrf?label=coverage)](https://codecov.io/gh/paradoxysm/nnrf)
 [![GitHub](https://flat.badgen.net/github/license/paradoxysm/nnrf)](https://github.com/paradoxysm/nnrf/blob/master/LICENSE)
 
-NNRF is a neural network with random forest structure as detailed by [Wang, S. et. al.](https://pdfs.semanticscholar.org/c0b1/2e04be429e70c0303215a3df21f5c5843052.pdf). This package implements the decision tree structured neural network (NNDT) and the accompanying NNRF, both in sklearn API style.
+NNRF is a neural network with random forest structure as detailed by [Wang, S. et. al.](https://pdfs.semanticscholar.org/c0b1/2e04be429e70c0303215a3df21f5c5843052.pdf). This package is implemented similar to the `sklearn` API style. It is not fully faithful as it includes modularity regarding activation, regularization, loss, and optimizer functions.
 
 The NNDT is structured like a binary decision tree with each node simulating a split. Furthermore, each node is a visible-hidden hybrid, taking in input from it ancestor node along with *r* features from the data. By training through backpropagation, NNDTs are able to model more powerful splits as well as tune all splits from leaf to root, resulting in better performance compared to traditional decision trees.
 
@@ -32,9 +32,26 @@ nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
 
 # Predict some data
 predictions = nnrf.predict(X_test)
+# Or just get the raw probabilities
+predictions = nnrf.predict_proba(X_test)
 ```
 
-A secondary classifier can easily be stacked upon the random forest. `nnrf` provides a simple neural network implementation as well as a dynamic ensemble selection method (DES-kNN).
+`nnrf` is built with modular activation, loss, regularization, and optimization algorithms, making it simple to build models with different or even custom implementations.
+
+```python
+from nnrf import NNRF
+from nnrf import ml
+
+# Using some default options
+nnrf = NNRF(loss='cross-entropy', optimizer='adam', regularize='l2')
+# Using some custom options
+o = ml.optimizer.SGD(alpha=0.01) 	# SGD with a learning rate of 0.01
+r = ml.regularizer.L2(c=0.001) 		# L2 Regularization with strength at 0.001
+a = ml.activation.PReLU(a=0.4)		# PReLU activation with parameter of 0.4
+nnrf = NNRF(optimizer=o, regularizer=r, activation=r)
+```
+
+Finally, a secondary classifier can easily be stacked upon the random forest. `nnrf` provides a simple neural network implementation as well as a dynamic ensemble selection method (DES-kNN).
 
 ```python
 from nnrf import NNRF, NeuralNetwork, DESKNN
@@ -52,8 +69,6 @@ nn.fit(p, Y_stack)
 nnrf = NNRF(n=50, d=5).fit(X_train, Y_train)
 des = DESKNN(ensemble=nnrf, k=100).fit(X_stack, Y_stack)
 ```
-
-DES-kNN is a dynamic ensemble selection model that takes the principle that some estimators in the ensemble perform better for certain regions of data. Using k-nearest neighbors, `nnrf` ranks NNDTs based on performance in the query region and considers this when deciding predictions.
 
 For full details on usage, see the [documentation](https://github.com/paradoxysm/nnrf/tree/master/doc).
 
