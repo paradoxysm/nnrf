@@ -60,3 +60,7 @@ def test_nn_unfit():
 	nn = NeuralNetwork()
 	with pytest.raises(RuntimeError):
 		nn.predict(test_X_bc)
+
+def test_nn_importance():
+	nn = NeuralNetwork().fit(train_X_iris, train_Y_iris)
+	nn.feature_importance(train_X_iris, train_Y_iris)
