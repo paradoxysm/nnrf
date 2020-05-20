@@ -344,7 +344,7 @@ class BaseClassifier(BaseEstimator):
 								X.shape[0])
 		return self._forward(X)
 
-	def features_importance(self, X, Y):
+	def feature_importance(self, X, Y):
 		"""
 		Calculate the feature importances by permuting
 		each feature separately and measuring the
@@ -379,7 +379,7 @@ class BaseClassifier(BaseEstimator):
 		importances = []
 		for f in range(X.shape[1]):
 			X_ = copy(X)
-			np.random_state.shuffle(X_[:,f])
+			self.random_state.shuffle(X_[:,f])
 			loss_ = self.loss.loss(self.predict_proba(X_), Y)
 			importances.append(np.exp(loss_) / loss)
 		return importances
