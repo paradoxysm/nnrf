@@ -150,6 +150,9 @@ class DESKNN(BaseEstimator):
 		if not self._is_fitted():
 			raise RuntimeError("Model is not fitted")
 		X = check_XY(X=X)
+		if X.shape[1] != self.n_features_:
+			raise ValueError("Model takes %d features as input" % self.n_features_,
+								"but data has %d features" % X.shape[1])
 		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
 		d, i = self.knn.kneighbors(X)
