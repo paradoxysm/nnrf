@@ -148,7 +148,7 @@ class DESKNN(BaseEstimator):
 			The order of classes is in sorted ascending order.
 		"""
 		if not self._is_fitted():
-			raise RunTimeError("Model is not fitted")
+			raise RuntimeError("Model is not fitted")
 		X = check_XY(X=X)
 		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
@@ -156,7 +156,7 @@ class DESKNN(BaseEstimator):
 		competence = self._calculate_competence(i) #NE
 		i_estimators = self._select(competence) # Ne
 		estimators = self.ensemble.estimators_
-		n_estimators = len(estimators)
+		n_estimators = i_estimators.shape[1]
 		pred = np.zeros((len(X), self.n_classes_))
 		for n in range(len(X)):
 			for e in range(n_estimators):
