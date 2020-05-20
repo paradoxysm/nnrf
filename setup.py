@@ -23,11 +23,8 @@ setup(
     install_requires=[
 		'numpy',
 		'tqdm',
-		'sklearn'
+		'sklearn',
     ],
-	extras_require={
-        'test': ['pytest', 'coverage', 'pytest-cov']
-    },
 	python_requires='>=3.4, <4',
 	classifiers=[
         'Development Status :: 3 - Alpha',
@@ -43,8 +40,8 @@ setup(
 		'Programming Language :: Python :: 3.7',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
-	'Topic :: Scientific/Engineering :: Information Analysis',
-	'Intended Audience :: Science/Research'
+		'Topic :: Scientific/Engineering :: Information Analysis',
+		'Intended Audience :: Science/Research',
     ],
 	keywords=['python','ml','neural-network','random-forest'],
     zip_safe=True)
