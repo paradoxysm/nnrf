@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from sklearn.datasets import load_breast_cancer, load_iris
 
-from nnrf import NeuralNetwork
+from nnrf import NNDT
 
 dataset = load_breast_cancer()
 data = dataset['data']
@@ -30,33 +30,32 @@ test_Y_iris = target[partition:]
 
 @pytest.mark.parametrize("params", [
 	({}),
-	({'layers':tuple()}),
-	({'layers':(200,100)}),
+	({'d':3, 'r':'log2'}),
 	({'loss':'mse'}),
 	({'optimizer':'sgd'}),
 	({'regularize':'l2'})
 ])
 
-class TestNN:
-	def test_nn_binary(self, params):
-		nn = NeuralNetwork(**params)
-		nn.fit(train_X_bc, train_Y_bc)
+class TestNNDT:
+	def test_nndt_binary(self, params):
+		nndt = NNDT(**params)
+		nndt.fit(train_X_bc, train_Y_bc)
 
-	def test_nn_multi(self, params):
-		nn = NeuralNetwork(**params)
-		nn.fit(train_X_iris, train_Y_iris)
+	def test_nndt_multi(self, params):
+		nndt = NNDT(**params)
+		nndt.fit(train_X_iris, train_Y_iris)
 
-	def test_nn_predict_binary(self, params):
-		nn = NeuralNetwork(**params)
-		nn.fit(train_X_bc, train_Y_bc)
-		nn.predict(test_X_bc)
+	def test_nndt_predict_binary(self, params):
+		nndt = NNDT(**params)
+		nndt.fit(train_X_bc, train_Y_bc)
+		nndt.predict(test_X_bc)
 
-	def test_nn_predict_multi(self, params):
-		nn = NeuralNetwork(**params)
-		nn.fit(train_X_iris, train_Y_iris)
-		nn.predict(test_X_iris)
+	def test_nndt_predict_multi(self, params):
+		nndt = NNDT(**params)
+		nndt.fit(train_X_iris, train_Y_iris)
+		nndt.predict(test_X_iris)
 
-def test_nn_unfit():
-	nn = NeuralNetwork()
+def test_nndt_unfit():
+	nndt = NNDT()
 	with pytest.raises(RuntimeError):
-		nn.predict(test_X_bc)
+		nndt.predict(test_X_bc)
