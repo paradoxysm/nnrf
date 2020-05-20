@@ -1,5 +1,6 @@
 import numpy as np
 from tqdm import trange
+from copy import copy
 from abc import ABC, abstractmethod
 
 from nnrf.utils import calculate_batch, create_random_state, \
@@ -336,46 +337,52 @@ class BaseClassifier(BaseEstimator):
 		if not self._is_fitted():
 			raise RuntimeError("Model is not fitted")
 		X = check_XY(X=X)
+		if X.shape[1] != self.n_features_:
+			raise ValueError("Model takes %d features as input" % self.n_features_,
+								"but data has %d features" % X.shape[1])
 		if self.verbose > 0 : print("Predicting %d samples." % \
 								X.shape[0])
 		return self._forward(X)
 
-	def score(self, Y, X=None, Y_hat=None, weights=None):
+	def features_importance(self, X, Y):
 		"""
-		Return mean metric of the estimator on the given
-		data/predictions and target labels.
-
-		If both data and predictions are provided, `score`
-		just uses the predictions.
+		Calculate the feature importances by permuting
+		each feature separately and measuring the
+		increase in loss.
 
 		Parameters
 		----------
+		X : array-like, shape=(n_samples, n_features)
+			Training data.
+
 		Y : array-like, shape=(n_samples,)
 			Target labels as integers.
 
-		X : array-like, shape=(n_samples, n_features), default=None
-			Data to predict.
-
-		Y_hat : array-like, shape=(n_samples,), default=None
-			Predicted labels.
-
-		weights : array-like, shape=(n_samples,), default=None
-			Sample weights. If None, then samples are equally weighted.
-
 		Returns
 		-------
-		score : float
-			Mean metric score of the estimator for the given
-			data/labels.
+		importances : list, shape=(n_features,)
+			List of feature importances by error increase,
+			in order of features as they appear in the data.
+			The larger the error increase, the more
+			important the feature.
 		"""
-		if X is None and Y_hat is None:
-			raise ValueError("Either X or Y_hat must be provided")
-		elif Y_hat is None:
-			Y_hat = self.predict(X)
-		if self.metric is not None:
-			if weights is None : weights = np.ones(len(Y_hat))
-			return self.metric.score(Y_hat, Y, weights=weights)
-		return 0
+		if not self._is_fitted():
+			raise RuntimeError("Model is not fitted")
+		X, Y = check_XY(X=X, Y=Y)
+		try : Y = one_hot(Y, cols=self.n_classes_)
+		except : raise
+		if X.shape[1] != self.n_features_:
+			raise ValueError("Model takes %d features as input" % self.n_features_,
+								"but data has %d features" % X.shape[1])
+		if self.verbose > 0 : print("Calculating feature importances")
+		loss = np.exp(self.loss.loss(self.predict_proba(X), Y))
+		importances = []
+		for f in range(X.shape[1]):
+			X_ = copy(X)
+			np.random_state.shuffle(X_[:,f])
+			loss_ = self.loss.loss(self.predict_proba(X_), Y)
+			importances.append(np.exp(loss_) / loss)
+		return importances
 
 	@abstractmethod
 	def _forward(self, X, *args, **kwargs):
