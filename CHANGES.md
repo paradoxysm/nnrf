@@ -9,10 +9,8 @@
 - ![Documentation](https://img.shields.io/badge/-Documentation-blue?style=flat-square) : An update to the documentation.
 - ![Other](https://img.shields.io/badge/-Other-lightgrey?style=flat-square) : Miscellaneous updates such as package structure or GitHub quality of life updates.
 
-### Version 1.0.0
-The following are changes to be implemented in the `1.0.0` release.
+### Version 0.9.0
 
 - ![Feature](https://img.shields.io/badge/-Feature-blueviolet?style=flat-square) :
 [`NNRF`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nnrf.py) and [`NNDT`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nndt.py) implemented!
 - ![Feature](https://img.shields.io/badge/-Feature-blueviolet?style=flat-square) : [`NeuralNetwork`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nn.py) and [`DESKNN`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_des_knn.py) implemented.
-- ![Documentation](https://img.shields.io/badge/-Documentation-blue?style=flat-square) : Basic documentation for `nnrf` created.
