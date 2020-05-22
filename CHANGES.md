@@ -14,3 +14,7 @@
 - ![Feature](https://img.shields.io/badge/-Feature-blueviolet?style=flat-square) :
 [`NNRF`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nnrf.py) and [`NNDT`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nndt.py) implemented!
 - ![Feature](https://img.shields.io/badge/-Feature-blueviolet?style=flat-square) : [`NeuralNetwork`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_nn.py) and [`DESKNN`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/_des_knn.py) implemented.
+
+### Version 0.9.1
+
+- ![Fix](https://img.shields.io/badge/-Fix-red?style=flat-square) : [`Optimizer`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/ml/optimizer.py) now extends [`Base`](https://github.com/paradoxysm/nnrf/blob/master/nnrf/utils/_base.py) for consistency.

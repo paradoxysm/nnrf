@@ -10,12 +10,12 @@ def read(*paths):
 
 setup(
 	name='nnrf',
-	version='0.9.0',
+	version='0.9.1',
     description='Neural Network with Random Forest Structure',
     long_description=(read('README.md') + '\n\n'),
 	long_description_content_type="text/markdown",
 	url='http://github.com/paradoxysm/nnrf',
-	download_url = 'https://github.com/paradoxysm/nnrf/archive/0.9.0.tar.gz',
+	download_url = 'https://github.com/paradoxysm/nnrf/archive/0.9.1.tar.gz',
     author='paradoxysm',
 	author_email='paradoxysm.dev@gmail.com',
     license='BSD-3-Clause',
