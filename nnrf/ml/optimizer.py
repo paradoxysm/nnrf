@@ -1,6 +1,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from nnrf.utils._base import Base
+
 def get_optimizer(name):
 	"""
 	Lookup table of default optimizers.
@@ -30,7 +32,7 @@ def get_optimizer(name):
 	elif isinstance(name, (type(None), Optimizer)) : return name
 	else : raise ValueError("Invalid optimizer")
 
-class Optimizer(ABC):
+class Optimizer(Base, ABC):
 	"""
 	Base Optimizer
 	"""
